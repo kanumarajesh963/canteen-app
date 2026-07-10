@@ -36,6 +36,8 @@ This is a **working demo**, not a production payment system:
     someone buys in person)
   - **Orders** — full log of online + walk-in orders
   - **Counter Sale** — log a walk-in purchase in a few taps; stock updates immediately
+- **My Orders** — every customer booking is saved to that device, with the full receipt viewable again anytime (nav → "My Orders")
+- One consistent typeface (Poppins) throughout, with subtle entrance/reveal animations
 - Reset-to-demo-data button for re-testing
 
 ## Run locally

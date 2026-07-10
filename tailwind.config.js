@@ -25,13 +25,45 @@ export default {
         sage: "#4C7A64",
       },
       fontFamily: {
-        chalk: ["'Kalam'", "cursive"],
-        body: ["'Work Sans'", "sans-serif"],
-        mono: ["'IBM Plex Mono'", "monospace"],
+        sans: ["'Poppins'", "sans-serif"],
+        chalk: ["'Poppins'", "sans-serif"],
+        body: ["'Poppins'", "sans-serif"],
+        mono: ["'Poppins'", "sans-serif"],
       },
       backgroundImage: {
         "chalk-texture":
           "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.03) 0%, transparent 40%), radial-gradient(circle at 80% 60%, rgba(255,255,255,0.02) 0%, transparent 45%)",
+      },
+      keyframes: {
+        fadeInUp: {
+          "0%": { opacity: "0", transform: "translateY(10px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        fadeIn: {
+          "0%": { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
+        popIn: {
+          "0%": { opacity: "0", transform: "scale(0.92) translateY(8px)" },
+          "100%": { opacity: "1", transform: "scale(1) translateY(0)" },
+        },
+        bump: {
+          "0%": { transform: "scale(1)" },
+          "40%": { transform: "scale(1.18)" },
+          "100%": { transform: "scale(1)" },
+        },
+        tokenReveal: {
+          "0%": { opacity: "0", transform: "scale(0.8) rotate(-3deg)" },
+          "60%": { opacity: "1", transform: "scale(1.03) rotate(1deg)" },
+          "100%": { opacity: "1", transform: "scale(1) rotate(0)" },
+        },
+      },
+      animation: {
+        "fade-in-up": "fadeInUp 0.5s ease-out both",
+        "fade-in": "fadeIn 0.25s ease-out both",
+        "pop-in": "popIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both",
+        bump: "bump 0.32s ease-out",
+        "token-reveal": "tokenReveal 0.45s cubic-bezier(0.34,1.56,0.64,1) both",
       },
     },
   },

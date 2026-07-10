@@ -7,9 +7,17 @@
 html, body, #root { height: 100%; }
 
 body {
-  font-family: 'Work Sans', sans-serif;
+  font-family: 'Poppins', sans-serif;
   background-color: #F6F1E4;
   color: #2B2620;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @layer utilities {
@@ -25,4 +33,9 @@ body {
 :focus-visible {
   outline: 2px solid #E8A93B;
   outline-offset: 2px;
+}
+
+.font-mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }

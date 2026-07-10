@@ -5,7 +5,7 @@ import { paymentApps } from "../lib/seed";
 import { Loader2, ShieldCheck } from "lucide-react";
 
 export default function Checkout() {
-  const { cart, products, placeOrder, canFulfill } = useStore();
+  const { cart, products, placeOrder, canFulfill, clearCart } = useStore();
   const [method, setMethod] = useState(null);
   const [processing, setProcessing] = useState(false);
   const navigate = useNavigate();
@@ -38,7 +38,10 @@ export default function Checkout() {
       const methodLabel = paymentApps.find((a) => a.id === method)?.name || method;
       const order = placeOrder({ items, paymentMethod: methodLabel, source: "online" });
       setProcessing(false);
-      if (order) navigate(`/success/${order.id}`);
+      if (order) {
+        clearCart();
+        navigate(`/success/${order.id}`);
+      }
     }, 1100);
   };
 

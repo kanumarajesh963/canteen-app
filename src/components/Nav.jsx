@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
-import { ShoppingBasket, LayoutDashboard } from "lucide-react";
+import { ShoppingBasket, LayoutDashboard, Receipt } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 
 export default function Nav({ onCartClick }) {
@@ -22,6 +22,18 @@ export default function Nav({ onCartClick }) {
 
         <nav className="flex items-center gap-2 sm:gap-4">
           <NavLink
+            to="/orders"
+            className={({ isActive }) =>
+              `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
+                isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+              }`
+            }
+          >
+            <Receipt size={16} />
+            <span className="hidden sm:inline">My Orders</span>
+          </NavLink>
+
+          <NavLink
             to={isAdmin ? "/admin" : "/admin/login"}
             className={({ isActive }) =>
               `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
@@ -40,7 +52,10 @@ export default function Nav({ onCartClick }) {
             <ShoppingBasket size={18} />
             <span className="hidden sm:inline">Cart</span>
             {cartCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 bg-brick text-white text-[11px] font-mono w-5 h-5 rounded-full flex items-center justify-center">
+              <span
+                key={cartCount}
+                className="absolute -top-1.5 -right-1.5 bg-brick text-white text-[11px] font-mono w-5 h-5 rounded-full flex items-center justify-center animate-bump"
+              >
                 {cartCount}
               </span>
             )}

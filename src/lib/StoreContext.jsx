@@ -4,6 +4,16 @@ import { seedProducts } from "./seed";
 const DB_KEY = "canteen_db_v1";
 const CART_KEY = "canteen_cart_v1";
 const AUTH_KEY = "canteen_admin_auth_v1";
+const MY_ORDERS_KEY = "canteen_my_orders_v1";
+
+function loadMyOrderIds() {
+  try {
+    const raw = localStorage.getItem(MY_ORDERS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
 
 function loadDB() {
   try {
@@ -36,8 +46,16 @@ export function StoreProvider({ children }) {
     }
   });
   const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem(AUTH_KEY) === "true");
+  const [myOrderIds, setMyOrderIds] = useState(loadMyOrderIds);
 
   useEffect(() => saveDB(db), [db]);
+  useEffect(() => {
+    try {
+      localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(myOrderIds));
+    } catch (e) {
+      console.error(e);
+    }
+  }, [myOrderIds]);
   useEffect(() => {
     try {
       localStorage.setItem(CART_KEY, JSON.stringify(cart));
@@ -148,6 +166,9 @@ export function StoreProvider({ children }) {
           nextToken: prev.nextToken + 1,
         };
       });
+      if (createdOrder && source === "online") {
+        setMyOrderIds((prev) => [createdOrder.id, ...prev]);
+      }
       return createdOrder;
     },
     []
@@ -182,12 +203,19 @@ export function StoreProvider({ children }) {
     const fresh = { products: seedProducts, orders: [], nextToken: 1 };
     setDB(fresh);
     setCart({});
+    setMyOrderIds([]);
   }, []);
+
+  const myOrders = useMemo(
+    () => myOrderIds.map((id) => db.orders.find((o) => o.id === id)).filter(Boolean),
+    [myOrderIds, db.orders]
+  );
 
   const value = useMemo(
     () => ({
       products: db.products,
       orders: db.orders,
+      myOrders,
       cart,
       isAdmin,
       addToCart,
@@ -204,7 +232,7 @@ export function StoreProvider({ children }) {
       logout,
       resetDemoData,
     }),
-    [db, cart, isAdmin, addToCart, setCartQty, clearCart, addProduct, updateProduct, deleteProduct, setStock, adjustStock, placeOrder, canFulfill, login, logout, resetDemoData]
+    [db, myOrders, cart, isAdmin, addToCart, setCartQty, clearCart, addProduct, updateProduct, deleteProduct, setStock, adjustStock, placeOrder, canFulfill, login, logout, resetDemoData]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

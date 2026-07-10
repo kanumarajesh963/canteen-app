@@ -5,6 +5,7 @@ import CartDrawer from "./components/CartDrawer";
 import Shop from "./pages/Shop";
 import Checkout from "./pages/Checkout";
 import Success from "./pages/Success";
+import MyOrders from "./pages/MyOrders";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import { Navigate } from "react-router-dom";
@@ -21,6 +22,7 @@ export default function App() {
           <Route path="/" element={<Shop />} />
           <Route path="/checkout" element={<Checkout />} />
           <Route path="/success/:orderId" element={<Success />} />
+          <Route path="/orders" element={<MyOrders />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={<Navigate to="/" replace />} />

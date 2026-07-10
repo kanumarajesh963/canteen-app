@@ -1,18 +1,24 @@
-import React from "react";
+import React, { useState } from "react";
 import { Plus, Minus } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 
 export default function ItemCard({ product }) {
   const { cart, addToCart, setCartQty } = useStore();
+  const [bumped, setBumped] = useState(false);
   const inCart = cart[product.id] || 0;
   const outOfStock = product.stock <= 0;
   const low = !outOfStock && product.stock <= 5;
 
+  const bump = () => {
+    setBumped(true);
+    setTimeout(() => setBumped(false), 320);
+  };
+
   return (
     <div
-      className={`relative bg-white rounded-2xl border-2 p-4 flex flex-col gap-3 transition ${
-        outOfStock ? "border-steel/20 opacity-60" : "border-ink/5 hover:border-turmeric hover:-translate-y-0.5"
-      }`}
+      className={`relative bg-white rounded-2xl border-2 p-4 flex flex-col gap-3 transition-all duration-200 ${
+        bumped ? "scale-[1.03] border-turmeric shadow-lg shadow-turmeric/10" : ""
+      } ${outOfStock ? "border-steel/20 opacity-60" : "border-ink/5 hover:border-turmeric hover:-translate-y-0.5"}`}
     >
       {low && (
         <span className="absolute top-3 right-3 text-[10px] font-mono uppercase tracking-wide bg-brick text-white px-2 py-0.5 rounded-full">
@@ -57,8 +63,11 @@ export default function ItemCard({ product }) {
           </div>
         ) : (
           <button
-            onClick={() => addToCart(product.id, 1)}
-            className="text-sm font-semibold bg-board text-paper px-4 py-1.5 rounded-full hover:bg-board-light transition"
+            onClick={() => {
+              addToCart(product.id, 1);
+              bump();
+            }}
+            className="text-sm font-semibold bg-board text-paper px-4 py-1.5 rounded-full hover:bg-board-light active:scale-95 transition"
           >
             Book
           </button>

@@ -19,12 +19,12 @@ export default function Shop() {
     <div className="max-w-6xl mx-auto px-4 sm:px-6 pb-16">
       {/* Hero: chalkboard menu */}
       <section className="mt-6 sm:mt-10 rounded-3xl bg-board bg-chalk-texture text-paper px-6 sm:px-10 py-10 sm:py-14 relative overflow-hidden">
-        <div className="absolute -right-10 -top-10 text-[140px] opacity-10 select-none">🍱</div>
-        <p className="font-mono text-turmeric-light text-xs tracking-[0.3em] uppercase mb-3">Today's Board</p>
-        <h1 className="font-chalk text-4xl sm:text-6xl leading-tight max-w-xl">
+        <div className="absolute -right-10 -top-10 text-[140px] opacity-10 select-none animate-fade-in" style={{ animationDelay: "200ms" }}>🍱</div>
+        <p className="font-mono text-turmeric-light text-xs tracking-[0.3em] uppercase mb-3 animate-fade-in-up">Today's Board</p>
+        <h1 className="font-chalk font-bold text-4xl sm:text-6xl leading-tight max-w-xl animate-fade-in-up" style={{ animationDelay: "80ms" }}>
           Book your snack. <br /> Skip the queue.
         </h1>
-        <p className="mt-4 text-paper/75 max-w-md">
+        <p className="mt-4 text-paper/75 max-w-md animate-fade-in-up" style={{ animationDelay: "160ms" }}>
           Reserve items from the counter, pay however suits you, and pick up with your token number.
           Stock updates live — what you see is what's left.
         </p>
@@ -58,8 +58,10 @@ export default function Shop() {
 
       {/* Grid */}
       <section className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-        {filtered.map((p) => (
-          <ItemCard key={p.id} product={p} />
+        {filtered.map((p, i) => (
+          <div key={p.id} className="animate-fade-in-up" style={{ animationDelay: `${Math.min(i, 8) * 45}ms` }}>
+            <ItemCard product={p} />
+          </div>
         ))}
         {filtered.length === 0 && (
           <p className="col-span-full text-center text-steel py-12">No items match — try a different search.</p>

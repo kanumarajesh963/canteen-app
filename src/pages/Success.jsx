@@ -20,9 +20,13 @@ export default function Success() {
   return (
     <div className="px-4 sm:px-6 py-10">
       <div className="text-center mb-6">
-        <span className="inline-block text-5xl mb-2">✅</span>
-        <h1 className="font-chalk text-3xl sm:text-4xl">Booking confirmed!</h1>
-        <p className="text-steel text-sm">Keep this token handy — hand it over when you collect your order.</p>
+        <span className="inline-block text-5xl mb-2 animate-pop-in">✅</span>
+        <h1 className="font-chalk font-bold text-3xl sm:text-4xl animate-fade-in-up" style={{ animationDelay: "100ms" }}>
+          Booking confirmed!
+        </h1>
+        <p className="text-steel text-sm animate-fade-in-up" style={{ animationDelay: "160ms" }}>
+          Keep this token handy — hand it over when you collect your order.
+        </p>
       </div>
 
       <TokenReceipt order={order} />

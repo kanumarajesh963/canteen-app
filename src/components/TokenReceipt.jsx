@@ -5,7 +5,7 @@ export default function TokenReceipt({ order }) {
   const date = new Date(order.date);
 
   return (
-    <div className="max-w-sm mx-auto">
+    <div className="max-w-sm mx-auto animate-token-reveal">
       <div className="bg-white rounded-t-2xl shadow-xl overflow-hidden border border-ink/10 border-b-0">
         <div className="bg-board text-paper text-center py-4">
           <p className="font-mono text-[11px] tracking-[0.3em] uppercase text-turmeric-light">Token Number</p>
