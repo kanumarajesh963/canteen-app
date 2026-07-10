@@ -392,6 +392,92 @@ export function StoreProvider({ companySlug, children }) {
     return data || [];
   }, [memberToken]);
 
+  // ---------- member: profile, email, password, daily check-in, tickets ----------
+  const myProfile = useCallback(async () => {
+    if (!memberToken) return null;
+    const { data } = await supabase.rpc("get_my_profile", { p_token: memberToken });
+    return data?.[0] || null;
+  }, [memberToken]);
+
+  const setMyEmail = useCallback(
+    async (email) => {
+      const { error } = await supabase.rpc("member_set_email", { p_token: memberToken, p_email: email });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
+  const changeMyPassword = useCallback(
+    async (oldPassword, newPassword) => {
+      const { error } = await supabase.rpc("member_change_password", {
+        p_token: memberToken,
+        p_old: oldPassword,
+        p_new: newPassword,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
+  const checkinStatusToday = useCallback(async () => {
+    if (!memberToken) return null;
+    const { data } = await supabase.rpc("member_checkin_status", { p_token: memberToken });
+    return data?.[0] || null; // { status: 'none'|'pending'|'yes'|'no', amount }
+  }, [memberToken]);
+
+  const checkinToday = useCallback(
+    async (coming) => {
+      const { data, error } = await supabase.rpc("member_checkin_today", {
+        p_token: memberToken,
+        p_coming: coming,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, ...data?.[0] };
+    },
+    [memberToken]
+  );
+
+  const raiseMyTicket = useCallback(
+    async (subject, message) => {
+      const { error } = await supabase.rpc("member_raise_ticket", {
+        p_token: memberToken,
+        p_subject: subject,
+        p_message: message,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
+  // ---------- seller: tickets + login stats ----------
+  const listTickets = useCallback(async () => {
+    if (!adminToken) return [];
+    const { data } = await supabase.rpc("admin_list_tickets", { p_token: adminToken });
+    return data || [];
+  }, [adminToken]);
+
+  const setTicketStatus = useCallback(
+    async (id, status) => {
+      await supabase.rpc("admin_set_ticket_status", { p_token: adminToken, p_id: id, p_status: status });
+    },
+    [adminToken]
+  );
+
+  const loginStats = useCallback(async () => {
+    if (!adminToken) return null;
+    const { data } = await supabase.rpc("admin_login_stats", { p_token: adminToken });
+    return data?.[0] || null;
+  }, [adminToken]);
+
+  const allCompanyLoginCounts = useCallback(async () => {
+    if (!adminToken) return [];
+    const { data } = await supabase.rpc("admin_all_company_login_counts", { p_token: adminToken });
+    return data || [];
+  }, [adminToken]);
+
   // ---------- seller: member roster management ----------
   const listMembers = useCallback(async () => {
     if (!adminToken) return [];
@@ -411,6 +497,7 @@ export function StoreProvider({ companySlug, children }) {
         p_password: member.password || null,
         p_daily_amount: member.dailyAmount ?? 250,
         p_active: member.active ?? true,
+        p_email: member.email || null,
       });
       if (error) return { ok: false, error: error.message };
       return { ok: true, member: data };
@@ -503,6 +590,16 @@ export function StoreProvider({ companySlug, children }) {
       loginMemberWithSession,
       logoutMember,
       myAttendance,
+      myProfile,
+      setMyEmail,
+      changeMyPassword,
+      checkinStatusToday,
+      checkinToday,
+      raiseMyTicket,
+      listTickets,
+      setTicketStatus,
+      loginStats,
+      allCompanyLoginCounts,
       listMembers,
       upsertMember,
       deleteMember,
@@ -518,6 +615,8 @@ export function StoreProvider({ companySlug, children }) {
       loginAdminWithToken, loginCustomer, logoutCustomer, rechargeWallet, walletTransactions, refreshWallet,
       setOrderStatus, isMember, memberInfo, loginMemberWithSession, logoutMember, myAttendance, listMembers,
       upsertMember, deleteMember, markAttendance, unmarkAttendance, attendanceForDate, getAttendanceRecords,
+      myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
+      listTickets, setTicketStatus, loginStats, allCompanyLoginCounts,
     ]
   );
 

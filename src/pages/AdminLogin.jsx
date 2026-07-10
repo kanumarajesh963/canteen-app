@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../lib/StoreContext";
 import { Lock, Loader2 } from "lucide-react";
+import PasswordInput from "../components/PasswordInput";
 
 export default function AdminLogin() {
   const { login, company } = useStore();
@@ -35,14 +36,7 @@ export default function AdminLogin() {
       <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
         <div>
           <label className="text-xs font-mono uppercase text-steel">Password</label>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-            placeholder="Enter seller password"
-            autoFocus
-          />
+          <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter seller password" autoFocus />
         </div>
         {error && <p className="text-brick text-sm">{error}</p>}
         <button

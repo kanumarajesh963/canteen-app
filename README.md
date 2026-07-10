@@ -179,3 +179,58 @@ appear alongside the existing ones.
   if you add/remove members partway through a month, past months' potential is still calculated using
   *current* active members × days, not who was active on each historical day. Good enough for a first pass;
   ask if you want it to track membership changes precisely over time.
+
+---
+
+# v3 features (this build)
+
+1. **Member email** — sellers set it when adding a member (Members tab), or the member adds/changes it themselves on their home page. This is where the morning mail goes.
+2. **Morning "coming to office?" email** — every morning each member with an email gets a mail with **✅ Yes / ❌ Not today** buttons. Tapping **Yes charges that member ₹250** (their `daily_amount`) as that day's collection — recorded in the same attendance system the seller's charts already use. The identical question also appears as a card on the member's home page, so members without email (or who missed the mail) can still answer in-app.
+3. **Logins per company** — new **Logins** tab in the seller dashboard: your company's logins today / unique members today / this month / all time, plus a table showing login counts for **every** company on the deployment.
+4. **Update password + show password** — every password field now has a show/hide eye toggle. Members can change their own password from their home page (current + new). Sellers can still reset any member's password from the Members tab.
+5. **Forgot password** — "Forgot password?" link on the member login. It raises a *password-reset ticket*; the seller sees it in the new **Tickets** tab, resets the password from the Members tab, and marks the ticket resolved.
+6. **Raise a ticket** — members have a "Raise a ticket" button on their home page; anonymous users can raise one via the forgot-password flow. Sellers manage all of them in the **Tickets** tab (open/resolve/reopen).
+
+## Setting up the morning email (one-time, ~10 minutes, free)
+
+Everything except *sending scheduled emails* runs on the existing Supabase setup. Email needs two free services:
+
+**A. Get a free email API key (Resend)**
+1. Sign up at [resend.com](https://resend.com) (free: 100 emails/day).
+2. Create an API key. For testing you can send from `onboarding@resend.dev` immediately; verify your own domain later for production.
+
+**B. Deploy the Edge Function**
+1. In your Supabase project: **Edge Functions → Deploy a new function**, name it `daily-checkin-email`, and paste the contents of [`supabase/functions/daily-checkin-email/index.ts`](./supabase/functions/daily-checkin-email/index.ts). (Or use the CLI: `supabase functions deploy daily-checkin-email`.)
+2. In **Edge Functions → Secrets**, add:
+   - `RESEND_API_KEY` — your Resend key
+   - `APP_URL` — your deployed frontend, e.g. `https://canteen-app-pi.vercel.app`
+   - `FROM_EMAIL` — e.g. `Canteen <onboarding@resend.dev>`
+3. Test it once: click **Invoke** (or `curl` it with your service role key). Members with emails get the mail instantly.
+
+**C. Schedule it for every morning**
+In Supabase: **Integrations → Cron** (enables `pg_cron` + `pg_net`), then SQL Editor:
+
+```sql
+select cron.schedule(
+  'daily-checkin-email',
+  '30 2 * * *',   -- 02:30 UTC = 08:00 IST every day
+  $$
+  select net.http_post(
+    url := 'https://YOUR-PROJECT-REF.supabase.co/functions/v1/daily-checkin-email',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer YOUR-SERVICE-ROLE-KEY'
+    ),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Replace `YOUR-PROJECT-REF` and `YOUR-SERVICE-ROLE-KEY` (Project Settings → API → service_role). Cron times are UTC — `30 2 * * *` is 8:00 AM IST.
+
+> If you skip the email setup entirely, everything else still works: members answer the same Yes/No question on their home page after logging in, and Yes still charges ₹250.
+
+## If you already ran the old schema
+
+Just paste and run the **whole updated `supabase/schema.sql`** again in the SQL Editor — every statement is idempotent, and the new v3 section at the bottom adds the email column, check-ins, tickets, and login-event tables/functions without touching your existing data.

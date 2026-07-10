@@ -22,6 +22,8 @@ import StatCard from "../components/StatCard";
 import ProductModal from "../components/ProductModal";
 import MembersManager from "../components/MembersManager";
 import AttendanceManager from "../components/AttendanceManager";
+import TicketsManager from "../components/TicketsManager";
+import LoginStats from "../components/LoginStats";
 
 const PIE_COLORS = ["#4C7A64", "#E8A93B", "#C0472A", "#1F3A2E", "#7C8B85", "#F3C876"];
 const STATUS_FLOW = ["placed", "preparing", "ready", "picked_up"];
@@ -76,6 +78,8 @@ export default function AdminDashboard() {
           ["counter", "Counter Sale"],
           ["members", "Members"],
           ["attendance", "Attendance"],
+          ["logins", "Logins"],
+          ["tickets", "Tickets"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -110,6 +114,10 @@ export default function AdminDashboard() {
       {tab === "members" && <MembersManager />}
 
       {tab === "attendance" && <AttendanceManager />}
+
+      {tab === "logins" && <LoginStats />}
+
+      {tab === "tickets" && <TicketsManager />}
 
       {modal && (
         <ProductModal

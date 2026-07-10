@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { Store, Loader2 } from "lucide-react";
 import { sellerLoginGlobal } from "../lib/globalAuth";
 import { supabaseConfigured } from "../lib/supabaseClient";
+import PasswordInput from "../components/PasswordInput";
 
 export default function SellerLoginGlobal() {
   const [username, setUsername] = useState("");
@@ -55,13 +56,7 @@ export default function SellerLoginGlobal() {
           </div>
           <div>
             <label className="text-xs font-mono uppercase text-steel">Password</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-              placeholder="Enter password"
-            />
+            <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} />
           </div>
           {error && <p className="text-brick text-sm">{error}</p>}
           <button

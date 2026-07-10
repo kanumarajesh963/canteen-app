@@ -779,3 +779,445 @@ and not exists (select 1 from members m where m.company_id = c.id);
 --   insert into members (company_id, member_number, name, username, password_hash, daily_amount)
 --   select id, 1, 'First Member', 'user1', crypt('a-real-password', gen_salt('bf')), 250
 --   from companies where slug = 'acme';
+
+-- =========================================================================
+-- v3 add-on: member emails, morning check-in mail (₹250 on "yes"),
+--            login counts per company, password self-service, tickets
+-- =========================================================================
+-- Safe to re-run — everything below is idempotent. If you already ran the
+-- file before, just run the WHOLE file again; only the new parts change.
+-- =========================================================================
+
+-- 1) Members now have an email — this is where the morning mail goes.
+alter table members add column if not exists email text;
+
+-- 2) Login events — powers "how many people logged in, per company".
+create table if not exists login_events (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references companies(id) on delete cascade,
+  member_id   uuid references members(id) on delete set null,
+  kind        text not null default 'member',   -- 'member' | 'seller'
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_login_events_company on login_events(company_id, created_at);
+alter table login_events enable row level security;
+-- no policies: only SECURITY DEFINER functions below can touch it.
+
+-- 3) Tickets — support requests + forgot-password requests.
+create table if not exists tickets (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references companies(id) on delete cascade,
+  member_id   uuid references members(id) on delete set null,
+  name        text,
+  contact     text,                               -- email or phone to reach them
+  subject     text not null,
+  message     text not null default '',
+  type        text not null default 'general',    -- 'general' | 'password_reset'
+  status      text not null default 'open',       -- 'open' | 'resolved'
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_tickets_company on tickets(company_id, status);
+alter table tickets enable row level security;
+-- no policies: RPC-only access.
+
+-- 4) Daily check-ins — one row per member per day. The morning email links
+--    to /checkin/<token>; answering YES charges that member ₹daily_amount
+--    (default 250) by inserting an attendance row for that date.
+create table if not exists checkins (
+  token         uuid primary key default gen_random_uuid(),
+  company_id    uuid not null references companies(id) on delete cascade,
+  member_id     uuid not null references members(id) on delete cascade,
+  checkin_date  date not null,
+  status        text not null default 'pending',  -- 'pending' | 'yes' | 'no'
+  responded_at  timestamptz,
+  created_at    timestamptz not null default now(),
+  unique(member_id, checkin_date)
+);
+create index if not exists idx_checkins_company_date on checkins(company_id, checkin_date);
+alter table checkins enable row level security;
+-- no policies: the token itself is the secret; access via RPCs only.
+
+-- ---------------------------------------------------------------------
+-- Re-define the two login functions so they also record a login event.
+-- (Same signatures as before — the frontend doesn't change.)
+-- ---------------------------------------------------------------------
+create or replace function seller_login(p_username text, p_password text)
+returns table(token uuid, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+  v_token uuid;
+begin
+  select * into v_company from companies where seller_username = p_username;
+  if v_company.id is null then
+    return;
+  end if;
+  if v_company.admin_password_hash <> crypt(p_password, v_company.admin_password_hash) then
+    return;
+  end if;
+  insert into admin_sessions(company_id) values (v_company.id) returning admin_sessions.token into v_token;
+  insert into login_events(company_id, kind) values (v_company.id, 'seller');
+  return query select v_token, v_company.slug, v_company.name;
+end;
+$$;
+
+create or replace function member_login(p_company_query text, p_username text, p_password text)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+  v_member members%rowtype;
+  v_token uuid;
+begin
+  select * into v_company from companies
+    where lower(slug) = lower(trim(p_company_query)) or lower(name) = lower(trim(p_company_query))
+    limit 1;
+  if v_company.id is null then
+    return;
+  end if;
+
+  select * into v_member from members where company_id = v_company.id and username = p_username;
+  if v_member.id is null then
+    return;
+  end if;
+  if v_member.password_hash <> crypt(p_password, v_member.password_hash) then
+    return;
+  end if;
+
+  insert into member_sessions(member_id) values (v_member.id) returning member_sessions.token into v_token;
+  insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+  return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Member self-service: profile (incl. email), change password
+-- ---------------------------------------------------------------------
+create or replace function get_my_profile(p_token uuid)
+returns table(member_number int, member_name text, username text, email text, daily_amount numeric)
+language sql
+security definer
+as $$
+  select m.member_number, m.name, m.username, m.email, m.daily_amount
+  from _member_from_token(p_token) m
+  where m.id is not null;
+$$;
+
+create or replace function member_set_email(p_token uuid, p_email text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype := _member_from_token(p_token);
+begin
+  if v_member.id is null then raise exception 'Not logged in'; end if;
+  if p_email is null or p_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'That does not look like a valid email address';
+  end if;
+  update members set email = lower(trim(p_email)) where id = v_member.id;
+  return true;
+end;
+$$;
+
+create or replace function member_change_password(p_token uuid, p_old text, p_new text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype := _member_from_token(p_token);
+begin
+  if v_member.id is null then raise exception 'Not logged in'; end if;
+  if v_member.password_hash <> crypt(p_old, v_member.password_hash) then
+    raise exception 'Current password is incorrect';
+  end if;
+  if p_new is null or length(p_new) < 6 then
+    raise exception 'New password must be at least 6 characters';
+  end if;
+  update members set password_hash = crypt(p_new, gen_salt('bf')) where id = v_member.id;
+  return true;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- admin_upsert_member now also takes the member's email.
+-- Drop the old 8-arg version so only this one exists.
+-- ---------------------------------------------------------------------
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean);
+
+create or replace function admin_upsert_member(
+  p_token uuid, p_id uuid, p_member_number int, p_name text,
+  p_username text, p_password text, p_daily_amount numeric, p_active boolean,
+  p_email text default null
+) returns members
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member members%rowtype;
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+
+  if p_id is null then
+    insert into members(company_id, member_number, name, username, password_hash, daily_amount, active, email)
+    values (
+      v_company_id, p_member_number, p_name, p_username,
+      crypt(coalesce(p_password, substr(gen_random_uuid()::text, 1, 8)), gen_salt('bf')),
+      coalesce(p_daily_amount, 250), coalesce(p_active, true),
+      nullif(lower(trim(p_email)), '')
+    )
+    returning * into v_member;
+  else
+    update members set
+      member_number = p_member_number,
+      name = p_name,
+      username = coalesce(p_username, username),
+      password_hash = case when p_password is not null and p_password <> '' then crypt(p_password, gen_salt('bf')) else password_hash end,
+      daily_amount = coalesce(p_daily_amount, daily_amount),
+      active = coalesce(p_active, active),
+      email = coalesce(nullif(lower(trim(p_email)), ''), email)
+    where id = p_id and company_id = v_company_id
+    returning * into v_member;
+  end if;
+  return v_member;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Daily check-in flow
+-- ---------------------------------------------------------------------
+-- Called by the SCHEDULED EDGE FUNCTION every morning (service-role only —
+-- execute is revoked from the public anon key below). Creates today's
+-- pending check-in row for every active member who has an email, and
+-- returns everything the mailer needs (token → link, email, name, amount).
+create or replace function create_daily_checkins(p_date date default current_date)
+returns table(token uuid, email text, member_name text, member_number int,
+              company_name text, company_slug text, daily_amount numeric)
+language plpgsql
+security definer
+as $$
+begin
+  insert into checkins(company_id, member_id, checkin_date)
+  select m.company_id, m.id, p_date
+  from members m
+  where m.active and m.email is not null
+  on conflict (member_id, checkin_date) do nothing;
+
+  return query
+  select c.token, m.email, coalesce(m.name, 'Member #' || m.member_number), m.member_number,
+         co.name, co.slug, m.daily_amount
+  from checkins c
+  join members m on m.id = c.member_id
+  join companies co on co.id = c.company_id
+  where c.checkin_date = p_date and c.status = 'pending' and m.email is not null;
+end;
+$$;
+revoke execute on function create_daily_checkins(date) from public, anon, authenticated;
+
+-- Public: look up a check-in by its token (the token IS the secret link).
+create or replace function get_checkin(p_token uuid)
+returns table(member_name text, member_number int, company_name text,
+              checkin_date date, status text, amount numeric)
+language sql
+security definer
+as $$
+  select coalesce(m.name, 'Member #' || m.member_number), m.member_number,
+         co.name, c.checkin_date, c.status, m.daily_amount
+  from checkins c
+  join members m on m.id = c.member_id
+  join companies co on co.id = c.company_id
+  where c.token = p_token;
+$$;
+
+-- Public: answer the check-in from the email link.
+-- YES → insert attendance for that date (charges daily_amount, e.g. ₹250).
+-- Answering twice is safe; the first answer sticks unless it was 'no' and
+-- they change to 'yes' the same day (then attendance is added).
+create or replace function respond_checkin(p_token uuid, p_coming boolean)
+returns table(status text, amount numeric)
+language plpgsql
+security definer
+as $$
+declare
+  v_row checkins%rowtype;
+  v_member members%rowtype;
+begin
+  select * into v_row from checkins where checkins.token = p_token;
+  if v_row.member_id is null then raise exception 'Invalid or expired check-in link'; end if;
+  if v_row.checkin_date <> current_date then
+    raise exception 'This check-in link was for %, not today', v_row.checkin_date;
+  end if;
+
+  select * into v_member from members where id = v_row.member_id;
+
+  if p_coming then
+    begin
+      insert into attendance(company_id, member_id, visit_date, amount)
+      values (v_row.company_id, v_row.member_id, v_row.checkin_date, v_member.daily_amount);
+    exception when unique_violation then null;  -- already charged today
+    end;
+    update checkins set status = 'yes', responded_at = now() where checkins.token = p_token;
+    return query select 'yes'::text, v_member.daily_amount;
+  else
+    if v_row.status = 'yes' then
+      -- already said yes earlier — don't silently un-charge; keep yes.
+      return query select 'yes'::text, v_member.daily_amount;
+      return;
+    end if;
+    update checkins set status = 'no', responded_at = now() where checkins.token = p_token;
+    return query select 'no'::text, 0::numeric;
+  end if;
+end;
+$$;
+
+-- In-app version for a logged-in member (works even without the email):
+create or replace function member_checkin_today(p_token uuid, p_coming boolean)
+returns table(status text, amount numeric)
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype := _member_from_token(p_token);
+  v_checkin_token uuid;
+begin
+  if v_member.id is null then raise exception 'Not logged in'; end if;
+
+  insert into checkins(company_id, member_id, checkin_date)
+  values (v_member.company_id, v_member.id, current_date)
+  on conflict (member_id, checkin_date) do nothing;
+
+  select checkins.token into v_checkin_token
+  from checkins where member_id = v_member.id and checkin_date = current_date;
+
+  return query select * from respond_checkin(v_checkin_token, p_coming);
+end;
+$$;
+
+create or replace function member_checkin_status(p_token uuid)
+returns table(status text, amount numeric)
+language sql
+security definer
+as $$
+  select coalesce(c.status, 'none'), m.daily_amount
+  from _member_from_token(p_token) m
+  left join checkins c on c.member_id = m.id and c.checkin_date = current_date
+  where m.id is not null;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Tickets
+-- ---------------------------------------------------------------------
+-- Public (no login needed — this is also the "forgot password" path):
+create or replace function raise_ticket(
+  p_company_query text, p_name text, p_contact text,
+  p_subject text, p_message text, p_type text default 'general'
+) returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+begin
+  select * into v_company from companies
+    where lower(slug) = lower(trim(p_company_query)) or lower(name) = lower(trim(p_company_query))
+    limit 1;
+  if v_company.id is null then raise exception 'Unknown company — check the company name'; end if;
+  if coalesce(trim(p_subject), '') = '' then raise exception 'Subject is required'; end if;
+  if p_type not in ('general', 'password_reset') then p_type := 'general'; end if;
+
+  insert into tickets(company_id, name, contact, subject, message, type)
+  values (v_company.id, p_name, p_contact, p_subject, coalesce(p_message, ''), p_type);
+  return true;
+end;
+$$;
+
+-- Logged-in member raising a ticket (auto-attached to their account):
+create or replace function member_raise_ticket(p_token uuid, p_subject text, p_message text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype := _member_from_token(p_token);
+begin
+  if v_member.id is null then raise exception 'Not logged in'; end if;
+  if coalesce(trim(p_subject), '') = '' then raise exception 'Subject is required'; end if;
+  insert into tickets(company_id, member_id, name, contact, subject, message, type)
+  values (v_member.company_id, v_member.id,
+          coalesce(v_member.name, 'Member #' || v_member.member_number),
+          v_member.email, p_subject, coalesce(p_message, ''), 'general');
+  return true;
+end;
+$$;
+
+create or replace function admin_list_tickets(p_token uuid)
+returns setof tickets
+language sql
+security definer
+as $$
+  select * from tickets
+  where company_id = _admin_company(p_token)
+  order by (status = 'open') desc, created_at desc;
+$$;
+
+create or replace function admin_set_ticket_status(p_token uuid, p_id uuid, p_status text)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _admin_company(p_token);
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if p_status not in ('open', 'resolved') then raise exception 'Invalid status'; end if;
+  update tickets set status = p_status where id = p_id and company_id = v_company_id;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Login stats
+-- ---------------------------------------------------------------------
+-- Your own company's numbers:
+create or replace function admin_login_stats(p_token uuid)
+returns table(today_logins bigint, today_unique_members bigint,
+              month_logins bigint, total_logins bigint)
+language sql
+security definer
+as $$
+  select
+    count(*) filter (where created_at::date = current_date and kind = 'member'),
+    count(distinct member_id) filter (where created_at::date = current_date and kind = 'member'),
+    count(*) filter (where date_trunc('month', created_at) = date_trunc('month', now()) and kind = 'member'),
+    count(*) filter (where kind = 'member')
+  from login_events
+  where company_id = _admin_company(p_token);
+$$;
+
+-- "For every company, how many people logged in" — visible to any
+-- logged-in seller (counts only, no names/PII from other companies):
+create or replace function admin_all_company_login_counts(p_token uuid)
+returns table(company_name text, company_slug text,
+              members_total bigint, logins_today bigint,
+              unique_members_today bigint, logins_total bigint)
+language plpgsql
+security definer
+as $$
+begin
+  if _admin_company(p_token) is null then raise exception 'Not authorized'; end if;
+  return query
+  select co.name, co.slug,
+    (select count(*) from members m where m.company_id = co.id and m.active),
+    (select count(*) from login_events e where e.company_id = co.id and e.kind = 'member' and e.created_at::date = current_date),
+    (select count(distinct e.member_id) from login_events e where e.company_id = co.id and e.kind = 'member' and e.created_at::date = current_date),
+    (select count(*) from login_events e where e.company_id = co.id and e.kind = 'member')
+  from companies co
+  order by co.name;
+end;
+$$;

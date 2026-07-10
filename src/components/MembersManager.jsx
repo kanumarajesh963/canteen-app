@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Loader2, X } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
+import PasswordInput from "./PasswordInput";
 
 export default function MembersManager() {
   const { listMembers, upsertMember, deleteMember } = useStore();
@@ -48,6 +49,7 @@ export default function MembersManager() {
                     #{m.member_number} · {m.name || "(no name)"}
                   </p>
                   <p className="text-xs text-steel font-mono">@{m.username}</p>
+                  {m.email && <p className="text-[11px] text-steel font-mono truncate max-w-[160px]">{m.email}</p>}
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => setModal(m)} className="p-1.5 rounded-lg hover:bg-paper2">
@@ -90,6 +92,7 @@ function MemberModal({ initial, onClose, onSave }) {
   const [memberNumber, setMemberNumber] = useState(initial?.member_number ?? "");
   const [name, setName] = useState(initial?.name ?? "");
   const [username, setUsername] = useState(initial?.username ?? "");
+  const [email, setEmail] = useState(initial?.email ?? "");
   const [password, setPassword] = useState("");
   const [dailyAmount, setDailyAmount] = useState(initial?.daily_amount ?? 250);
   const [active, setActive] = useState(initial?.active ?? true);
@@ -104,6 +107,7 @@ function MemberModal({ initial, onClose, onSave }) {
       memberNumber: Number(memberNumber),
       name,
       username,
+      email: email.trim() || undefined,
       password: password || undefined,
       dailyAmount: Number(dailyAmount),
       active,
@@ -154,12 +158,16 @@ function MemberModal({ initial, onClose, onSave }) {
             <label className="text-xs font-mono uppercase text-steel">
               {initial ? "New password (leave blank to keep current)" : "Password"}
             </label>
+            <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required={!initial} />
+          </div>
+          <div>
+            <label className="text-xs font-mono uppercase text-steel">Email (for the morning check-in mail)</label>
             <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric"
-              required={!initial}
+              placeholder="member@company.com"
             />
           </div>
           <div>

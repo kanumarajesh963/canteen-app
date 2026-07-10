@@ -13,6 +13,8 @@ import Landing from "./pages/Landing";
 import SellerLoginGlobal from "./pages/SellerLoginGlobal";
 import MemberLoginGlobal from "./pages/MemberLoginGlobal";
 import MemberHome from "./pages/MemberHome";
+import ForgotPassword from "./pages/ForgotPassword";
+import CheckinPage from "./pages/CheckinPage";
 import { StoreProvider, useStore } from "./lib/StoreContext";
 import { supabaseConfigured } from "./lib/supabaseClient";
 
@@ -22,6 +24,8 @@ export default function App() {
       <Route path="/" element={<Landing />} />
       <Route path="/seller/login" element={<SellerLoginGlobal />} />
       <Route path="/member/login" element={<MemberLoginGlobal />} />
+      <Route path="/member/forgot" element={<ForgotPassword />} />
+      <Route path="/checkin/:token" element={<CheckinPage />} />
       <Route path="/:companySlug/*" element={<CompanyApp />} />
     </Routes>
   );
