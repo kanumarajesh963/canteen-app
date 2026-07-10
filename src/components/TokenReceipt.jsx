@@ -1,8 +1,10 @@
 import React from "react";
 
+const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready for pickup", picked_up: "Picked up" };
+
 export default function TokenReceipt({ order }) {
   if (!order) return null;
-  const date = new Date(order.date);
+  const date = new Date(order.created_at);
 
   return (
     <div className="max-w-sm mx-auto animate-token-reveal">
@@ -34,9 +36,12 @@ export default function TokenReceipt({ order }) {
             <span className="font-mono text-xl font-bold text-sage">₹{order.total}</span>
           </div>
 
-          <div className="mt-3 text-center">
+          <div className="mt-3 flex flex-col items-center gap-2">
             <span className="inline-block text-[11px] font-mono uppercase tracking-wide bg-sage/10 text-sage px-3 py-1 rounded-full">
-              Paid via {order.paymentMethod}
+              Paid via {order.payment_method}
+            </span>
+            <span className="inline-block text-[11px] font-mono uppercase tracking-wide bg-turmeric/15 text-turmeric-dark px-3 py-1 rounded-full">
+              {STATUS_LABEL[order.status] || order.status}
             </span>
           </div>
         </div>

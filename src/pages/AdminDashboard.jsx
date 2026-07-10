@@ -15,21 +15,23 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { IndianRupee, TrendingUp, ShoppingBag, PackageMinus, Plus, Pencil, Trash2, LogOut, RotateCcw } from "lucide-react";
+import { IndianRupee, TrendingUp, ShoppingBag, PackageMinus, Plus, Pencil, Trash2, LogOut, AlertTriangle } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import { summarize, dailySeries, monthlySeries, topSellers, categoryBreakdown } from "../lib/analytics";
 import StatCard from "../components/StatCard";
 import ProductModal from "../components/ProductModal";
 
 const PIE_COLORS = ["#4C7A64", "#E8A93B", "#C0472A", "#1F3A2E", "#7C8B85", "#F3C876"];
+const STATUS_FLOW = ["placed", "preparing", "ready", "picked_up"];
+const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready", picked_up: "Picked up" };
 
 export default function AdminDashboard() {
-  const { isAdmin, logout, orders, products, addProduct, updateProduct, deleteProduct, setStock, placeOrder, canFulfill, resetDemoData } =
-    useStore();
+  const {
+    isAdmin, logout, orders, products, addProduct, updateProduct, deleteProduct, setStock,
+    placeOrder, canFulfill, lowStockProducts, setOrderStatus, company,
+  } = useStore();
   const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // null | 'new' | product
-
-  if (!isAdmin) return <Navigate to="/admin/login" replace />;
 
   const stats = useMemo(() => summarize(orders), [orders]);
   const daily = useMemo(() => dailySeries(orders, 14), [orders]);
@@ -37,12 +39,14 @@ export default function AdminDashboard() {
   const sellers = useMemo(() => topSellers(orders), [orders]);
   const catData = useMemo(() => categoryBreakdown(orders, products), [orders, products]);
 
+  if (!isAdmin) return <Navigate to={`/${company.slug}/admin/login`} replace />;
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="font-chalk text-3xl sm:text-4xl">Seller Dashboard</h1>
-          <p className="text-steel text-sm">Track sales, manage stock, and log counter purchases.</p>
+          <p className="text-steel text-sm">Track sales, manage stock, and log counter purchases for {company.name}.</p>
         </div>
         <button
           onClick={logout}
@@ -51,6 +55,16 @@ export default function AdminDashboard() {
           <LogOut size={15} /> Log out
         </button>
       </div>
+
+      {lowStockProducts.length > 0 && (
+        <div className="mb-6 bg-brick/10 border border-brick/20 text-brick rounded-2xl p-4 flex items-start gap-3">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+          <div>
+            <p className="font-semibold text-sm">Running low: {lowStockProducts.map((p) => p.name).join(", ")}</p>
+            <p className="text-xs mt-0.5">Restock these before they hit zero — check the Inventory tab.</p>
+          </div>
+        </div>
+      )}
 
       <div className="flex gap-2 mb-6 overflow-x-auto scrollbar-none">
         {[
@@ -85,20 +99,9 @@ export default function AdminDashboard() {
         />
       )}
 
-      {tab === "orders" && <Orders orders={orders} />}
+      {tab === "orders" && <Orders orders={orders} setOrderStatus={setOrderStatus} />}
 
       {tab === "counter" && <CounterSale products={products} placeOrder={placeOrder} canFulfill={canFulfill} />}
-
-      <div className="mt-10 text-center">
-        <button
-          onClick={() => {
-            if (confirm("Reset all demo data (products, stock, orders) back to defaults?")) resetDemoData();
-          }}
-          className="inline-flex items-center gap-1.5 text-xs font-mono text-steel hover:text-brick"
-        >
-          <RotateCcw size={13} /> Reset demo data
-        </button>
-      </div>
 
       {modal && (
         <ProductModal
@@ -254,84 +257,108 @@ function Inventory({ products, setStock, onEdit, onDelete, onAdd }) {
       </div>
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {products.map((p) => (
-          <div key={p.id} className="bg-white rounded-2xl border border-ink/5 p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">{p.emoji}</span>
-                <div>
-                  <p className="font-semibold text-sm leading-tight">{p.name}</p>
-                  <p className="text-xs text-steel font-mono">{p.category}</p>
+        {products.map((p) => {
+          const low = p.stock <= (p.low_stock_threshold ?? 5);
+          return (
+            <div key={p.id} className={`bg-white rounded-2xl border p-4 ${low ? "border-brick/40" : "border-ink/5"}`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{p.emoji}</span>
+                  <div>
+                    <p className="font-semibold text-sm leading-tight">{p.name}</p>
+                    <p className="text-xs text-steel font-mono">{p.category}</p>
+                  </div>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => onEdit(p)} className="p-1.5 rounded-lg hover:bg-paper2">
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    onClick={() => confirm(`Remove ${p.name} from the menu?`) && onDelete(p.id)}
+                    className="p-1.5 rounded-lg hover:bg-brick/10 text-brick"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                 </div>
               </div>
-              <div className="flex gap-1">
-                <button onClick={() => onEdit(p)} className="p-1.5 rounded-lg hover:bg-paper2">
-                  <Pencil size={14} />
-                </button>
-                <button
-                  onClick={() => confirm(`Remove ${p.name} from the menu?`) && onDelete(p.id)}
-                  className="p-1.5 rounded-lg hover:bg-brick/10 text-brick"
-                >
-                  <Trash2 size={14} />
-                </button>
+
+              {low && (
+                <p className="mt-2 text-[11px] font-mono text-brick flex items-center gap-1">
+                  <AlertTriangle size={11} /> Below threshold of {p.low_stock_threshold ?? 5}
+                </p>
+              )}
+
+              <div className="flex justify-between text-xs font-mono text-steel mt-3">
+                <span>Sell ₹{p.price}</span>
+                <span>Cost ₹{p.cost}</span>
+                <span className="text-sage font-semibold">+₹{p.price - p.cost} margin</span>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <span className="text-xs font-mono text-steel">Stock:</span>
+                <input
+                  type="number"
+                  min="0"
+                  defaultValue={p.stock}
+                  onBlur={(e) => setStock(p.id, Number(e.target.value))}
+                  className={`w-20 px-2 py-1 rounded-lg border font-mono text-sm ${
+                    low ? "border-brick text-brick" : "border-ink/15"
+                  }`}
+                />
+                <span className="text-xs text-steel">{p.unit}(s)</span>
               </div>
             </div>
-
-            <div className="flex justify-between text-xs font-mono text-steel mt-3">
-              <span>Sell ₹{p.price}</span>
-              <span>Cost ₹{p.cost}</span>
-              <span className="text-sage font-semibold">+₹{p.price - p.cost} margin</span>
-            </div>
-
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs font-mono text-steel">Stock:</span>
-              <input
-                type="number"
-                min="0"
-                value={p.stock}
-                onChange={(e) => setStock(p.id, Number(e.target.value))}
-                className={`w-20 px-2 py-1 rounded-lg border font-mono text-sm ${
-                  p.stock <= 5 ? "border-brick text-brick" : "border-ink/15"
-                }`}
-              />
-              <span className="text-xs text-steel">{p.unit}(s)</span>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function Orders({ orders }) {
+function Orders({ orders, setOrderStatus }) {
   return (
     <div className="bg-white rounded-2xl border border-ink/5 overflow-hidden">
       {orders.length === 0 ? (
-        <p className="text-steel text-sm py-12 text-center">No orders yet today.</p>
+        <p className="text-steel text-sm py-12 text-center">No orders yet.</p>
       ) : (
         <div className="divide-y divide-ink/5">
-          {orders.map((o) => (
-            <div key={o.id} className="p-4 flex flex-wrap items-center gap-3">
-              <span className="font-mono text-xs bg-board text-paper px-2.5 py-1 rounded-full">
-                #{String(o.token).padStart(3, "0")}
-              </span>
-              <span className="text-xs font-mono text-steel">
-                {new Date(o.date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-              </span>
-              <span
-                className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full ${
-                  o.source === "counter" ? "bg-turmeric/20 text-turmeric-dark" : "bg-sage/10 text-sage"
-                }`}
-              >
-                {o.source === "counter" ? "Walk-in" : "Online"}
-              </span>
-              <span className="text-sm flex-1 min-w-[140px] text-steel truncate">
-                {o.items.map((it) => `${it.name} ×${it.qty}`).join(", ")}
-              </span>
-              <span className="text-xs font-mono text-steel">{o.paymentMethod}</span>
-              <span className="font-mono font-semibold text-sage">₹{o.total}</span>
-            </div>
-          ))}
+          {orders.map((o) => {
+            const nextStatus = STATUS_FLOW[STATUS_FLOW.indexOf(o.status) + 1];
+            return (
+              <div key={o.id} className="p-4 flex flex-wrap items-center gap-3">
+                <span className="font-mono text-xs bg-board text-paper px-2.5 py-1 rounded-full">
+                  #{String(o.token).padStart(3, "0")}
+                </span>
+                <span className="text-xs font-mono text-steel">
+                  {new Date(o.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </span>
+                <span
+                  className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full ${
+                    o.source === "counter" ? "bg-turmeric/20 text-turmeric-dark" : "bg-sage/10 text-sage"
+                  }`}
+                >
+                  {o.source === "counter" ? "Walk-in" : "Online"}
+                </span>
+                <span className="text-sm flex-1 min-w-[140px] text-steel truncate">
+                  {o.items.map((it) => `${it.name} ×${it.qty}`).join(", ")}
+                </span>
+                <span className="text-xs font-mono text-steel">{o.payment_method}</span>
+                <span className="font-mono font-semibold text-sage">₹{o.total}</span>
+
+                <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-board/10 text-board">
+                  {STATUS_LABEL[o.status] || o.status}
+                </span>
+                {nextStatus && (
+                  <button
+                    onClick={() => setOrderStatus(o.id, nextStatus)}
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full bg-turmeric hover:bg-turmeric-dark text-ink transition"
+                  >
+                    Mark {STATUS_LABEL[nextStatus]}
+                  </button>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -342,6 +369,7 @@ function CounterSale({ products, placeOrder, canFulfill }) {
   const [qtyMap, setQtyMap] = useState({});
   const [payMethod, setPayMethod] = useState("cash");
   const [lastOrder, setLastOrder] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const items = Object.entries(qtyMap)
     .filter(([, q]) => q > 0)
@@ -351,13 +379,23 @@ function CounterSale({ products, placeOrder, canFulfill }) {
     return s + (p ? p.price * it.qty : 0);
   }, 0);
 
-  const record = () => {
+  const record = async () => {
     if (items.length === 0) return;
     if (!canFulfill(items)) {
       alert("Not enough stock for one of the selected items.");
       return;
     }
-    const order = placeOrder({ items, paymentMethod: payMethod === "cash" ? "Cash" : "Card (counter)", source: "counter" });
+    setSubmitting(true);
+    const { order, error } = await placeOrder({
+      items,
+      paymentMethod: payMethod === "cash" ? "Cash" : "Card (counter)",
+      source: "counter",
+    });
+    setSubmitting(false);
+    if (error) {
+      alert(error);
+      return;
+    }
     setLastOrder(order);
     setQtyMap({});
   };
@@ -365,7 +403,7 @@ function CounterSale({ products, placeOrder, canFulfill }) {
   return (
     <div className="max-w-2xl">
       <p className="text-steel text-sm mb-4">
-        Someone walked up to the shop and bought directly? Log it here — stock updates immediately.
+        Someone walked up to the shop and bought directly? Log it here — stock updates immediately for online buyers too.
       </p>
 
       <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 space-y-3">
@@ -406,7 +444,7 @@ function CounterSale({ products, placeOrder, canFulfill }) {
         <span className="font-mono font-semibold text-sage ml-auto">Total ₹{total}</span>
         <button
           onClick={record}
-          disabled={items.length === 0}
+          disabled={items.length === 0 || submitting}
           className="bg-turmeric hover:bg-turmeric-dark disabled:bg-steel/30 text-ink font-semibold px-5 py-2.5 rounded-full transition"
         >
           Record sale

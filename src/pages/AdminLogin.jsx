@@ -1,18 +1,22 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useStore } from "../lib/StoreContext";
-import { Lock } from "lucide-react";
+import { Lock, Loader2 } from "lucide-react";
 
 export default function AdminLogin() {
-  const { login } = useStore();
+  const { login, company } = useStore();
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    if (login(password)) {
-      navigate("/admin");
+    setSubmitting(true);
+    const ok = await login(password);
+    setSubmitting(false);
+    if (ok) {
+      navigate(`/${company.slug}/admin`);
     } else {
       setError("That password doesn't match. Try again.");
     }
@@ -25,7 +29,7 @@ export default function AdminLogin() {
           <Lock size={24} />
         </div>
         <h1 className="font-chalk text-3xl">Seller Login</h1>
-        <p className="text-steel text-sm">Manage stock, orders and today's sales.</p>
+        <p className="text-steel text-sm">Manage stock, orders and today's sales for {company.name}.</p>
       </div>
 
       <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
@@ -43,12 +47,14 @@ export default function AdminLogin() {
         {error && <p className="text-brick text-sm">{error}</p>}
         <button
           type="submit"
-          className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-3 rounded-full transition"
+          disabled={submitting}
+          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
         >
+          {submitting && <Loader2 size={16} className="animate-spin" />}
           Log in
         </button>
         <p className="text-[11px] text-steel font-mono text-center">
-          Demo password: <span className="font-semibold">canteen123</span>
+          Set/change this in Supabase (companies.admin_password_hash). Demo company password: canteen123
         </p>
       </form>
     </div>

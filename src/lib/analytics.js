@@ -9,9 +9,9 @@ function isSameYear(a, b) {
 }
 
 export function summarize(orders, refDate = new Date()) {
-  const today = orders.filter((o) => isSameDay(new Date(o.date), refDate));
-  const month = orders.filter((o) => isSameMonth(new Date(o.date), refDate));
-  const year = orders.filter((o) => isSameYear(new Date(o.date), refDate));
+  const today = orders.filter((o) => isSameDay(new Date(o.created_at), refDate));
+  const month = orders.filter((o) => isSameMonth(new Date(o.created_at), refDate));
+  const year = orders.filter((o) => isSameYear(new Date(o.created_at), refDate));
 
   const totalOf = (list) => list.reduce((s, o) => s + o.total, 0);
   const profitOf = (list) => list.reduce((s, o) => s + o.profit, 0);
@@ -36,7 +36,7 @@ export function dailySeries(orders, days = 14) {
     map.set(key, { date: key, label: d.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }), revenue: 0, profit: 0 });
   }
   orders.forEach((o) => {
-    const key = new Date(o.date).toISOString().slice(0, 10);
+    const key = new Date(o.created_at).toISOString().slice(0, 10);
     if (map.has(key)) {
       const entry = map.get(key);
       entry.revenue += o.total;
@@ -54,7 +54,7 @@ export function monthlySeries(orders, year = new Date().getFullYear()) {
     profit: 0,
   }));
   orders.forEach((o) => {
-    const d = new Date(o.date);
+    const d = new Date(o.created_at);
     if (d.getFullYear() === year) {
       months[d.getMonth()].revenue += o.total;
       months[d.getMonth()].profit += o.profit;

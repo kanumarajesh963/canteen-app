@@ -1,12 +1,22 @@
 import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useStore } from "../lib/StoreContext";
 import TokenReceipt from "../components/TokenReceipt";
-import { Receipt, ChevronRight, X } from "lucide-react";
+import { Receipt, ChevronRight, X, RotateCw } from "lucide-react";
+
+const STATUS_STYLE = {
+  placed: "bg-steel/10 text-steel",
+  preparing: "bg-turmeric/15 text-turmeric-dark",
+  ready: "bg-sage/10 text-sage",
+  picked_up: "bg-board/10 text-board",
+};
+const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready", picked_up: "Picked up" };
 
 export default function MyOrders() {
-  const { myOrders } = useStore();
+  const { myOrders, company, reorderItems } = useStore();
+  const navigate = useNavigate();
   const [selected, setSelected] = useState(null);
+  const [reorderMsg, setReorderMsg] = useState("");
 
   if (myOrders.length === 0) {
     return (
@@ -14,51 +24,65 @@ export default function MyOrders() {
         <div className="text-5xl mb-3">🧾</div>
         <h1 className="font-semibold text-xl mb-1">No orders yet</h1>
         <p className="text-steel text-sm mb-5">Everything you book will show up here, with your receipts.</p>
-        <Link to="/" className="inline-block bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full transition">
+        <Link to={`/${company.slug}`} className="inline-block bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full transition">
           Browse the menu
         </Link>
       </div>
     );
   }
 
+  const doReorder = (e, order) => {
+    e.stopPropagation();
+    const count = reorderItems(order);
+    setReorderMsg(count > 0 ? "Added to your cart." : "Those items are out of stock right now.");
+    setTimeout(() => setReorderMsg(""), 2500);
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
       <h1 className="text-3xl sm:text-4xl font-bold mb-1 animate-fade-in-up">My Orders</h1>
       <p className="text-steel text-sm mb-6 animate-fade-in-up">
-        {myOrders.length} past order{myOrders.length > 1 ? "s" : ""} on this device.
+        {myOrders.length} past order{myOrders.length > 1 ? "s" : ""}. Status updates live as the counter works on them.
       </p>
+      {reorderMsg && <p className="text-sm font-mono text-sage mb-4">{reorderMsg}</p>}
 
       <div className="space-y-3">
         {myOrders.map((o, i) => (
-          <button
+          <div
             key={o.id}
-            onClick={() => setSelected(o)}
             style={{ animationDelay: `${i * 40}ms` }}
-            className="w-full text-left bg-white rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric hover:-translate-y-0.5 transition animate-fade-in-up"
+            className="w-full text-left bg-white rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric hover:-translate-y-0.5 transition animate-fade-in-up cursor-pointer"
+            onClick={() => setSelected(o)}
           >
             <div className="w-11 h-11 rounded-full bg-board text-turmeric-light flex items-center justify-center shrink-0">
               <Receipt size={18} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-sm">Token #{String(o.token).padStart(3, "0")}</span>
-                <span className="text-[10px] font-medium uppercase tracking-wide bg-sage/10 text-sage px-2 py-0.5 rounded-full">
-                  {o.status === "paid" ? "Paid" : o.status}
+                <span className={`text-[10px] font-medium uppercase tracking-wide px-2 py-0.5 rounded-full ${STATUS_STYLE[o.status] || "bg-steel/10 text-steel"}`}>
+                  {STATUS_LABEL[o.status] || o.status}
                 </span>
               </div>
               <p className="text-xs text-steel truncate mt-0.5">
                 {o.items.map((it) => `${it.name} ×${it.qty}`).join(", ")}
               </p>
               <p className="text-[11px] text-steel mt-0.5">
-                {new Date(o.date).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                {" · "}{o.paymentMethod}
+                {new Date(o.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                {" · "}{o.payment_method}
               </p>
             </div>
-            <div className="text-right shrink-0">
+            <div className="text-right shrink-0 flex flex-col items-end gap-1.5">
               <p className="font-bold text-sage">₹{o.total}</p>
+              <button
+                onClick={(e) => doReorder(e, o)}
+                className="flex items-center gap-1 text-[11px] font-medium text-steel hover:text-turmeric-dark border border-ink/10 hover:border-turmeric px-2 py-1 rounded-full transition"
+              >
+                <RotateCw size={11} /> Reorder
+              </button>
             </div>
             <ChevronRight size={18} className="text-steel shrink-0" />
-          </button>
+          </div>
         ))}
       </div>
 

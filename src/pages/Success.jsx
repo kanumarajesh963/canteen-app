@@ -5,14 +5,14 @@ import TokenReceipt from "../components/TokenReceipt";
 
 export default function Success() {
   const { orderId } = useParams();
-  const { orders } = useStore();
+  const { orders, company } = useStore();
   const order = orders.find((o) => o.id === orderId);
 
   if (!order) {
     return (
       <div className="max-w-md mx-auto text-center py-24 px-4">
         <p className="text-steel mb-4">We couldn't find that order.</p>
-        <Link to="/" className="text-sage font-semibold underline">Back to the counter</Link>
+        <Link to={`/${company.slug}`} className="text-sage font-semibold underline">Back to the counter</Link>
       </div>
     );
   }
@@ -25,7 +25,7 @@ export default function Success() {
           Booking confirmed!
         </h1>
         <p className="text-steel text-sm animate-fade-in-up" style={{ animationDelay: "160ms" }}>
-          Keep this token handy — hand it over when you collect your order.
+          Keep this token handy — the status below updates live as the counter prepares it.
         </p>
       </div>
 
@@ -33,7 +33,7 @@ export default function Success() {
 
       <div className="text-center mt-8">
         <Link
-          to="/"
+          to={`/${company.slug}`}
           className="inline-block bg-board text-paper font-semibold px-6 py-3 rounded-full hover:bg-board-light transition"
         >
           Book something else

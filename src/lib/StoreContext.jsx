@@ -1,77 +1,191 @@
-import React, { createContext, useContext, useEffect, useMemo, useState, useCallback } from "react";
-import { seedProducts } from "./seed";
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { supabase, supabaseConfigured } from "./supabaseClient";
+import { getDeviceId } from "./identity";
 
-const DB_KEY = "canteen_db_v1";
-const CART_KEY = "canteen_cart_v1";
-const AUTH_KEY = "canteen_admin_auth_v1";
-const MY_ORDERS_KEY = "canteen_my_orders_v1";
-
-function loadMyOrderIds() {
-  try {
-    const raw = localStorage.getItem(MY_ORDERS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function loadDB() {
-  try {
-    const raw = localStorage.getItem(DB_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {
-    console.error("Failed to load canteen data", e);
-  }
-  return { products: seedProducts, orders: [], nextToken: 1 };
-}
-
-function saveDB(db) {
-  try {
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
-  } catch (e) {
-    console.error("Failed to save canteen data", e);
-  }
-}
+export const paymentApps = [
+  { id: "wallet", name: "Canteen Wallet", emoji: "👛" },
+  { id: "gpay", name: "Google Pay", emoji: "🟢" },
+  { id: "phonepe", name: "PhonePe", emoji: "🟣" },
+  { id: "paytm", name: "Paytm", emoji: "🔵" },
+  { id: "card", name: "Debit / Credit Card", emoji: "💳" },
+  { id: "cash", name: "Pay at Counter (Cash)", emoji: "💵" },
+];
 
 const StoreContext = createContext(null);
 
-export function StoreProvider({ children }) {
-  const [db, setDB] = useState(loadDB);
+export function StoreProvider({ companySlug, children }) {
+  const deviceId = useMemo(() => getDeviceId(), []);
+  const custKey = `canteen_customer_${companySlug}`;
+  const cartKey = `canteen_cart_${companySlug}`;
+  const myOrdersKey = `canteen_my_orders_${companySlug}`;
+  const adminKey = `canteen_admin_token_${companySlug}`;
+
+  const [loading, setLoading] = useState(true);
+  const [notFound, setNotFound] = useState(false);
+  const [company, setCompany] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [orders, setOrders] = useState([]); // admin sees all; buyer's own list is derived
   const [cart, setCart] = useState(() => {
     try {
-      const raw = localStorage.getItem(CART_KEY);
-      return raw ? JSON.parse(raw) : {};
+      return JSON.parse(localStorage.getItem(cartKey)) || {};
     } catch {
       return {};
     }
   });
-  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem(AUTH_KEY) === "true");
-  const [myOrderIds, setMyOrderIds] = useState(loadMyOrderIds);
-
-  useEffect(() => saveDB(db), [db]);
-  useEffect(() => {
+  const [customerId, setCustomerId] = useState(() => localStorage.getItem(custKey + "_id"));
+  const [customerPhone, setCustomerPhone] = useState(() => localStorage.getItem(custKey + "_phone"));
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [adminToken, setAdminToken] = useState(() => localStorage.getItem(adminKey));
+  const [myOrderIds, setMyOrderIds] = useState(() => {
     try {
-      localStorage.setItem(MY_ORDERS_KEY, JSON.stringify(myOrderIds));
-    } catch (e) {
-      console.error(e);
+      return JSON.parse(localStorage.getItem(myOrdersKey)) || [];
+    } catch {
+      return [];
     }
-  }, [myOrderIds]);
-  useEffect(() => {
-    try {
-      localStorage.setItem(CART_KEY, JSON.stringify(cart));
-    } catch (e) {
-      console.error(e);
-    }
-  }, [cart]);
+  });
 
-  // ---------- Cart ----------
+  const companyIdRef = useRef(null);
+
+  // ---------- persist small bits of local state ----------
+  useEffect(() => {
+    localStorage.setItem(cartKey, JSON.stringify(cart));
+  }, [cart, cartKey]);
+  useEffect(() => {
+    localStorage.setItem(myOrdersKey, JSON.stringify(myOrderIds));
+  }, [myOrderIds, myOrdersKey]);
+  useEffect(() => {
+    if (adminToken) localStorage.setItem(adminKey, adminToken);
+    else localStorage.removeItem(adminKey);
+  }, [adminToken, adminKey]);
+
+  // ---------- initial load: resolve company, products, orders ----------
+  const loadAll = useCallback(async () => {
+    setLoading(true);
+    const { data: companyRow, error: companyErr } = await supabase
+      .from("companies")
+      .select("id, slug, name, emoji")
+      .eq("slug", companySlug)
+      .maybeSingle();
+
+    if (companyErr || !companyRow) {
+      setNotFound(true);
+      setLoading(false);
+      return;
+    }
+    setCompany(companyRow);
+    companyIdRef.current = companyRow.id;
+
+    const [{ data: productRows }, { data: orderRows }] = await Promise.all([
+      supabase.from("products").select("*").eq("company_id", companyRow.id).order("category"),
+      supabase.from("orders").select("*").eq("company_id", companyRow.id).order("created_at", { ascending: false }).limit(300),
+    ]);
+    setProducts(productRows || []);
+    setOrders(orderRows || []);
+    setLoading(false);
+  }, [companySlug]);
+
+  useEffect(() => {
+    if (supabaseConfigured) loadAll();
+    else setLoading(false);
+  }, [loadAll]);
+
+  // ---------- realtime: products + orders for this company ----------
+  useEffect(() => {
+    if (!company) return;
+    const channel = supabase
+      .channel(`company-${company.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products", filter: `company_id=eq.${company.id}` },
+        (payload) => {
+          setProducts((prev) => {
+            if (payload.eventType === "DELETE") return prev.filter((p) => p.id !== payload.old.id);
+            const exists = prev.some((p) => p.id === payload.new.id);
+            return exists ? prev.map((p) => (p.id === payload.new.id ? payload.new : p)) : [...prev, payload.new];
+          });
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `company_id=eq.${company.id}` },
+        (payload) => {
+          setOrders((prev) => {
+            if (payload.eventType === "DELETE") return prev.filter((o) => o.id !== payload.old.id);
+            const exists = prev.some((o) => o.id === payload.new.id);
+            return exists ? prev.map((o) => (o.id === payload.new.id ? payload.new : o)) : [payload.new, ...prev];
+          });
+        }
+      )
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [company]);
+
+  // ---------- wallet balance ----------
+  const refreshWallet = useCallback(
+    async (custId) => {
+      const id = custId || customerId;
+      if (!id) return;
+      const { data } = await supabase.rpc("get_wallet_balance", { p_customer_id: id });
+      if (typeof data === "number") setWalletBalance(data);
+    },
+    [customerId]
+  );
+
+  useEffect(() => {
+    if (customerId) refreshWallet(customerId);
+  }, [customerId, refreshWallet]);
+
+  // ---------- buyer identity ----------
+  const loginCustomer = useCallback(
+    async (phone, name) => {
+      const { data, error } = await supabase.rpc("get_or_create_customer", {
+        p_company_slug: companySlug,
+        p_phone: phone,
+        p_name: name || null,
+        p_device_id: deviceId,
+      });
+      if (error || !data || !data[0]) return false;
+      const row = data[0];
+      setCustomerId(row.customer_id);
+      setCustomerPhone(phone);
+      setWalletBalance(row.balance);
+      localStorage.setItem(custKey + "_id", row.customer_id);
+      localStorage.setItem(custKey + "_phone", phone);
+      return true;
+    },
+    [companySlug, deviceId, custKey]
+  );
+
+  const logoutCustomer = useCallback(() => {
+    setCustomerId(null);
+    setCustomerPhone(null);
+    setWalletBalance(0);
+    localStorage.removeItem(custKey + "_id");
+    localStorage.removeItem(custKey + "_phone");
+  }, [custKey]);
+
+  const rechargeWallet = useCallback(
+    async (amount) => {
+      if (!customerId) return { ok: false, error: "Log in with your phone number first." };
+      const { data, error } = await supabase.rpc("wallet_recharge", { p_customer_id: customerId, p_amount: amount });
+      if (error) return { ok: false, error: error.message };
+      setWalletBalance(data);
+      return { ok: true, balance: data };
+    },
+    [customerId]
+  );
+
+  const walletTransactions = useCallback(async () => {
+    if (!customerId) return [];
+    const { data } = await supabase.rpc("get_wallet_transactions", { p_customer_id: customerId });
+    return data || [];
+  }, [customerId]);
+
+  // ---------- cart ----------
   const addToCart = useCallback((productId, qty = 1) => {
-    setCart((prev) => {
-      const current = prev[productId] || 0;
-      return { ...prev, [productId]: current + qty };
-    });
+    setCart((prev) => ({ ...prev, [productId]: (prev[productId] || 0) + qty }));
   }, []);
-
   const setCartQty = useCallback((productId, qty) => {
     setCart((prev) => {
       const next = { ...prev };
@@ -80,144 +194,171 @@ export function StoreProvider({ children }) {
       return next;
     });
   }, []);
-
   const clearCart = useCallback(() => setCart({}), []);
 
-  // ---------- Products ----------
-  const addProduct = useCallback((product) => {
-    setDB((prev) => ({
-      ...prev,
-      products: [...prev.products, { ...product, id: "p" + Date.now() }],
-    }));
-  }, []);
-
-  const updateProduct = useCallback((id, patch) => {
-    setDB((prev) => ({
-      ...prev,
-      products: prev.products.map((p) => (p.id === id ? { ...p, ...patch } : p)),
-    }));
-  }, []);
-
-  const deleteProduct = useCallback((id) => {
-    setDB((prev) => ({ ...prev, products: prev.products.filter((p) => p.id !== id) }));
-  }, []);
-
-  const setStock = useCallback((id, stock) => {
-    setDB((prev) => ({
-      ...prev,
-      products: prev.products.map((p) => (p.id === id ? { ...p, stock: Math.max(0, stock) } : p)),
-    }));
-  }, []);
-
-  const adjustStock = useCallback((id, delta) => {
-    setDB((prev) => ({
-      ...prev,
-      products: prev.products.map((p) =>
-        p.id === id ? { ...p, stock: Math.max(0, p.stock + delta) } : p
-      ),
-    }));
-  }, []);
-
-  // ---------- Orders ----------
-  // items: [{ productId, qty }]
-  const placeOrder = useCallback(
-    ({ items, paymentMethod, source = "online" }) => {
-      let createdOrder = null;
-      setDB((prev) => {
-        const productsById = Object.fromEntries(prev.products.map((p) => [p.id, p]));
-        // validate stock
-        for (const it of items) {
-          const p = productsById[it.productId];
-          if (!p || p.stock < it.qty) return prev; // silently abort, caller should check first
-        }
-        const orderItems = items.map((it) => {
-          const p = productsById[it.productId];
-          return {
-            productId: p.id,
-            name: p.name,
-            emoji: p.emoji,
-            qty: it.qty,
-            price: p.price,
-            cost: p.cost,
-          };
-        });
-        const total = orderItems.reduce((s, it) => s + it.price * it.qty, 0);
-        const profit = orderItems.reduce((s, it) => s + (it.price - it.cost) * it.qty, 0);
-        const order = {
-          id: "ord_" + Date.now(),
-          token: prev.nextToken,
-          date: new Date().toISOString(),
-          items: orderItems,
-          total,
-          profit,
-          paymentMethod,
-          source,
-          status: "paid",
-        };
-        createdOrder = order;
-        const updatedProducts = prev.products.map((p) => {
-          const match = items.find((it) => it.productId === p.id);
-          return match ? { ...p, stock: p.stock - match.qty } : p;
-        });
-        return {
-          ...prev,
-          products: updatedProducts,
-          orders: [order, ...prev.orders],
-          nextToken: prev.nextToken + 1,
-        };
-      });
-      if (createdOrder && source === "online") {
-        setMyOrderIds((prev) => [createdOrder.id, ...prev]);
-      }
-      return createdOrder;
-    },
-    []
-  );
-
+  // ---------- orders (buyer) ----------
   const canFulfill = useCallback(
-    (items) => {
-      return items.every((it) => {
-        const p = db.products.find((x) => x.id === it.productId);
+    (items) =>
+      items.every((it) => {
+        const p = products.find((x) => x.id === it.productId);
         return p && p.stock >= it.qty;
-      });
-    },
-    [db.products]
+      }),
+    [products]
   );
 
-  // ---------- Admin auth (demo only, NOT secure — for real deployment wire up real auth) ----------
-  const login = useCallback((password) => {
-    if (password === "canteen123") {
-      localStorage.setItem(AUTH_KEY, "true");
-      setIsAdmin(true);
+  const placeOrder = useCallback(
+    async ({ items, paymentMethod, source = "online" }) => {
+      const { data, error } = await supabase.rpc("place_order", {
+        p_company_slug: companySlug,
+        p_items: items,
+        p_payment_method: paymentMethod,
+        p_source: source,
+        p_customer_id: customerId || null,
+        p_device_id: deviceId,
+      });
+      if (error) return { order: null, error: error.message };
+      const order = data;
+      setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)]);
+      if (source === "online") setMyOrderIds((prev) => [order.id, ...prev]);
+      if (paymentMethod === "Wallet") refreshWallet();
+      return { order, error: null };
+    },
+    [companySlug, customerId, deviceId, refreshWallet]
+  );
+
+  const reorderItems = useCallback(
+    (order) => {
+      const additions = {};
+      for (const it of order.items) {
+        const p = products.find((x) => x.id === it.productId);
+        if (p && p.stock > 0) additions[it.productId] = Math.min(it.qty, p.stock);
+      }
+      setCart((prev) => {
+        const next = { ...prev };
+        for (const [id, qty] of Object.entries(additions)) next[id] = (next[id] || 0) + qty;
+        return next;
+      });
+      return Object.keys(additions).length;
+    },
+    [products]
+  );
+
+  const myOrders = useMemo(() => {
+    const byId = orders.filter((o) => myOrderIds.includes(o.id));
+    const byCustomer = customerId ? orders.filter((o) => o.customer_id === customerId) : [];
+    const merged = [...byId, ...byCustomer];
+    const seen = new Set();
+    return merged
+      .filter((o) => (seen.has(o.id) ? false : (seen.add(o.id), true)))
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }, [orders, myOrderIds, customerId]);
+
+  // ---------- admin ----------
+  const isAdmin = Boolean(adminToken);
+
+  const login = useCallback(
+    async (password) => {
+      const { data, error } = await supabase.rpc("admin_login", { p_slug: companySlug, p_password: password });
+      if (error || !data) return false;
+      setAdminToken(data);
       return true;
-    }
-    return false;
-  }, []);
+    },
+    [companySlug]
+  );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem(AUTH_KEY);
-    setIsAdmin(false);
-  }, []);
+  const logout = useCallback(async () => {
+    if (adminToken) await supabase.rpc("admin_logout", { p_token: adminToken });
+    setAdminToken(null);
+  }, [adminToken]);
 
-  const resetDemoData = useCallback(() => {
-    const fresh = { products: seedProducts, orders: [], nextToken: 1 };
-    setDB(fresh);
-    setCart({});
-    setMyOrderIds([]);
-  }, []);
+  const addProduct = useCallback(
+    async (product) => {
+      await supabase.rpc("admin_upsert_product", {
+        p_token: adminToken,
+        p_id: null,
+        p_name: product.name,
+        p_category: product.category,
+        p_emoji: product.emoji,
+        p_price: product.price,
+        p_cost: product.cost,
+        p_stock: product.stock,
+        p_low_stock_threshold: product.lowStockThreshold ?? 5,
+        p_unit: product.unit,
+      });
+    },
+    [adminToken]
+  );
 
-  const myOrders = useMemo(
-    () => myOrderIds.map((id) => db.orders.find((o) => o.id === id)).filter(Boolean),
-    [myOrderIds, db.orders]
+  const updateProduct = useCallback(
+    async (id, patch) => {
+      const existing = products.find((p) => p.id === id);
+      const merged = { ...existing, ...patch };
+      await supabase.rpc("admin_upsert_product", {
+        p_token: adminToken,
+        p_id: id,
+        p_name: merged.name,
+        p_category: merged.category,
+        p_emoji: merged.emoji,
+        p_price: merged.price,
+        p_cost: merged.cost,
+        p_stock: merged.stock,
+        p_low_stock_threshold: merged.low_stock_threshold ?? merged.lowStockThreshold ?? 5,
+        p_unit: merged.unit,
+      });
+    },
+    [adminToken, products]
+  );
+
+  const deleteProduct = useCallback(
+    async (id) => {
+      await supabase.rpc("admin_delete_product", { p_token: adminToken, p_id: id });
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    },
+    [adminToken]
+  );
+
+  const setStock = useCallback(
+    async (id, stock) => {
+      await supabase.rpc("admin_set_stock", { p_token: adminToken, p_id: id, p_stock: stock });
+    },
+    [adminToken]
+  );
+
+  const adjustStock = useCallback(
+    async (id, delta) => {
+      const p = products.find((x) => x.id === id);
+      if (!p) return;
+      await setStock(id, Math.max(0, p.stock + delta));
+    },
+    [products, setStock]
+  );
+
+  const setOrderStatus = useCallback(
+    async (orderId, status) => {
+      await supabase.rpc("admin_set_order_status", { p_token: adminToken, p_order_id: orderId, p_status: status });
+    },
+    [adminToken]
+  );
+
+  const lowStockProducts = useMemo(
+    () => products.filter((p) => p.stock <= (p.low_stock_threshold ?? 5)),
+    [products]
   );
 
   const value = useMemo(
     () => ({
-      products: db.products,
-      orders: db.orders,
+      loading,
+      notFound,
+      company,
+      products,
+      orders,
       myOrders,
       cart,
       isAdmin,
+      customerId,
+      customerPhone,
+      walletBalance,
+      lowStockProducts,
       addToCart,
       setCartQty,
       clearCart,
@@ -228,11 +369,22 @@ export function StoreProvider({ children }) {
       adjustStock,
       placeOrder,
       canFulfill,
+      reorderItems,
       login,
       logout,
-      resetDemoData,
+      loginCustomer,
+      logoutCustomer,
+      rechargeWallet,
+      walletTransactions,
+      refreshWallet,
+      setOrderStatus,
     }),
-    [db, myOrders, cart, isAdmin, addToCart, setCartQty, clearCart, addProduct, updateProduct, deleteProduct, setStock, adjustStock, placeOrder, canFulfill, login, logout, resetDemoData]
+    [
+      loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
+      walletBalance, lowStockProducts, addToCart, setCartQty, clearCart, addProduct, updateProduct,
+      deleteProduct, setStock, adjustStock, placeOrder, canFulfill, reorderItems, login, logout,
+      loginCustomer, logoutCustomer, rechargeWallet, walletTransactions, refreshWallet, setOrderStatus,
+    ]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

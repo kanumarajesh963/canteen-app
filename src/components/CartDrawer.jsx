@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useStore } from "../lib/StoreContext";
 
 export default function CartDrawer({ open, onClose }) {
-  const { cart, products, setCartQty, clearCart } = useStore();
+  const { cart, products, setCartQty, clearCart, company } = useStore();
   const navigate = useNavigate();
 
   const lines = Object.entries(cart)
@@ -83,7 +83,7 @@ export default function CartDrawer({ open, onClose }) {
               <button
                 onClick={() => {
                   onClose();
-                  navigate("/checkout");
+                  navigate(`/${company.slug}/checkout`);
                 }}
                 className="flex-1 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-2.5 rounded-full transition"
               >

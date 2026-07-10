@@ -1,28 +1,41 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
-import { ShoppingBasket, LayoutDashboard, Receipt } from "lucide-react";
+import { ShoppingBasket, LayoutDashboard, Receipt, Wallet } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 
 export default function Nav({ onCartClick }) {
-  const { cart, isAdmin } = useStore();
+  const { cart, isAdmin, company, walletBalance, customerId } = useStore();
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
+  const base = `/${company.slug}`;
 
   return (
     <header className="sticky top-0 z-30 bg-board text-paper shadow-md">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2 group">
-          <span className="text-2xl leading-none">🍱</span>
+        <Link to={base} className="flex items-center gap-2 group">
+          <span className="text-2xl leading-none">{company.emoji}</span>
           <div className="leading-tight">
-            <div className="font-chalk text-xl sm:text-2xl tracking-wide">The Canteen Counter</div>
+            <div className="font-chalk text-xl sm:text-2xl tracking-wide">{company.name}</div>
             <div className="hidden sm:block text-[11px] font-mono text-turmeric-light/90 tracking-widest uppercase">
-              Corporate Office Canteen
+              Office Canteen
             </div>
           </div>
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-4">
           <NavLink
-            to="/orders"
+            to={`${base}/wallet`}
+            className={({ isActive }) =>
+              `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
+                isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+              }`
+            }
+          >
+            <Wallet size={16} />
+            {customerId ? `₹${walletBalance}` : "Wallet"}
+          </NavLink>
+
+          <NavLink
+            to={`${base}/orders`}
             className={({ isActive }) =>
               `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
                 isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
@@ -34,7 +47,7 @@ export default function Nav({ onCartClick }) {
           </NavLink>
 
           <NavLink
-            to={isAdmin ? "/admin" : "/admin/login"}
+            to={isAdmin ? `${base}/admin` : `${base}/admin/login`}
             className={({ isActive }) =>
               `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
                 isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"

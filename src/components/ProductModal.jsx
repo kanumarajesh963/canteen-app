@@ -5,7 +5,9 @@ const EMOJI_CHOICES = ["🍫", "🥟", "🍔", "☕", "🥤", "🥪", "🍜", "�
 
 export default function ProductModal({ initial, onClose, onSave }) {
   const [form, setForm] = useState(
-    initial || { name: "", category: "Snacks", emoji: "🍫", price: "", cost: "", stock: "", unit: "pc" }
+    initial
+      ? { ...initial, lowStockThreshold: initial.low_stock_threshold ?? 5 }
+      : { name: "", category: "Snacks", emoji: "🍫", price: "", cost: "", stock: "", unit: "pc", lowStockThreshold: 5 }
   );
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
@@ -18,6 +20,7 @@ export default function ProductModal({ initial, onClose, onSave }) {
       price: Number(form.price),
       cost: Number(form.cost),
       stock: Number(form.stock),
+      lowStockThreshold: Number(form.lowStockThreshold) || 5,
     });
   };
 
@@ -78,6 +81,18 @@ export default function ProductModal({ initial, onClose, onSave }) {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-mono uppercase text-steel">Low stock alert threshold</label>
+            <input
+              type="number"
+              min="0"
+              value={form.lowStockThreshold}
+              onChange={(e) => set("lowStockThreshold", e.target.value)}
+              className="mt-1 w-full px-3.5 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
+            />
+            <p className="text-[11px] text-steel mt-1">You'll see a restock banner once stock drops to this number.</p>
           </div>
 
           <div className="grid grid-cols-3 gap-3">
