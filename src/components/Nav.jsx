@@ -1,10 +1,10 @@
 import React from "react";
 import { Link, NavLink } from "react-router-dom";
-import { ShoppingBasket, LayoutDashboard, Receipt, Wallet } from "lucide-react";
+import { ShoppingBasket, LayoutDashboard, Receipt, Wallet, UserCircle2 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 
 export default function Nav({ onCartClick }) {
-  const { cart, isAdmin, company, walletBalance, customerId } = useStore();
+  const { cart, isAdmin, company, walletBalance, customerId, isMember } = useStore();
   const cartCount = Object.values(cart).reduce((a, b) => a + b, 0);
   const base = `/${company.slug}`;
 
@@ -47,7 +47,19 @@ export default function Nav({ onCartClick }) {
           </NavLink>
 
           <NavLink
-            to={isAdmin ? `${base}/admin` : `${base}/admin/login`}
+            to={isMember ? `${base}/member` : "/member/login"}
+            className={({ isActive }) =>
+              `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
+                isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+              }`
+            }
+          >
+            <UserCircle2 size={16} />
+            {isMember ? "Member" : "Member Login"}
+          </NavLink>
+
+          <NavLink
+            to={isAdmin ? `${base}/admin` : "/seller/login"}
             className={({ isActive }) =>
               `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
                 isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"

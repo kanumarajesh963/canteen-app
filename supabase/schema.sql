@@ -465,3 +465,317 @@ and not exists (select 1 from products p where p.company_id = c.id);
 --   insert into companies (slug, name, emoji, admin_password_hash)
 --   values ('acme', 'Acme Corp Canteen', '🍔', crypt('a-new-password', gen_salt('bf')));
 -- Then its shop is instantly live at:  https://your-app.vercel.app/acme
+
+-- =========================================================================
+-- Membership attendance & daily-collection add-on
+-- =========================================================================
+-- What this adds, on top of everything above:
+--   * Every company gets a globally-unique `seller_username` so the seller
+--     can log in from one shared page with just username + password — no
+--     need to know/type the company slug.
+--   * `members` — a company's list of people who pay a flat daily amount
+--     (default Rs 250) on days they actually show up. Each member logs in
+--     with Company name/slug + their own username + password.
+--   * `attendance` — one row per member per day they were marked present,
+--     recording exactly how much was collected from them that day.
+--   * The seller marks which member numbers were present each day
+--     (mark_attendance) and gets day/month/year charts of
+--     collected vs "potential" (what it would've been if everyone showed
+--     up) vs the difference, which this app calls "profit" per your spec:
+--     profit = potential - collected.
+-- Safe to re-run: every statement below is idempotent.
+-- =========================================================================
+
+alter table companies add column if not exists seller_username text unique;
+
+create table if not exists members (
+  id            uuid primary key default gen_random_uuid(),
+  company_id    uuid not null references companies(id) on delete cascade,
+  member_number int not null,
+  name          text,
+  username      text not null,
+  password_hash text not null,
+  daily_amount  numeric not null default 250,
+  active        boolean not null default true,
+  created_at    timestamptz not null default now(),
+  unique(company_id, member_number),
+  unique(company_id, username)
+);
+create index if not exists idx_members_company on members(company_id);
+
+create table if not exists attendance (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references companies(id) on delete cascade,
+  member_id   uuid not null references members(id) on delete cascade,
+  visit_date  date not null,
+  amount      numeric not null,
+  created_at  timestamptz not null default now(),
+  unique(company_id, member_id, visit_date)
+);
+create index if not exists idx_attendance_company_date on attendance(company_id, visit_date);
+
+create table if not exists member_sessions (
+  token       uuid primary key default gen_random_uuid(),
+  member_id   uuid not null references members(id) on delete cascade,
+  created_at  timestamptz not null default now(),
+  expires_at  timestamptz not null default (now() + interval '12 hours')
+);
+
+alter table members enable row level security;
+alter table attendance enable row level security;
+alter table member_sessions enable row level security;
+-- No select policies on any of the three -- same pattern as the rest of this
+-- file: the anon key can't read or write them directly, only the
+-- SECURITY DEFINER functions below can, after checking a valid token.
+
+-- ---------------------------------------------------------------------
+-- Seller login -- GLOBAL username, no company slug needed up front.
+-- ---------------------------------------------------------------------
+create or replace function seller_login(p_username text, p_password text)
+returns table(token uuid, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+  v_token uuid;
+begin
+  select * into v_company from companies where seller_username = p_username;
+  if v_company.id is null then
+    return;
+  end if;
+  if v_company.admin_password_hash <> crypt(p_password, v_company.admin_password_hash) then
+    return;
+  end if;
+  insert into admin_sessions(company_id) values (v_company.id) returning admin_sessions.token into v_token;
+  return query select v_token, v_company.slug, v_company.name;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Member (buyer) login -- Company name/slug + their own username + password.
+-- ---------------------------------------------------------------------
+create or replace function member_login(p_company_query text, p_username text, p_password text)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+  v_member members%rowtype;
+  v_token uuid;
+begin
+  select * into v_company from companies
+    where lower(slug) = lower(trim(p_company_query)) or lower(name) = lower(trim(p_company_query))
+    limit 1;
+  if v_company.id is null then
+    return;
+  end if;
+
+  select * into v_member from members where company_id = v_company.id and username = p_username;
+  if v_member.id is null then
+    return;
+  end if;
+  if v_member.password_hash <> crypt(p_password, v_member.password_hash) then
+    return;
+  end if;
+
+  insert into member_sessions(member_id) values (v_member.id) returning member_sessions.token into v_token;
+  return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name;
+end;
+$$;
+
+create or replace function member_logout(p_token uuid)
+returns void
+language sql
+security definer
+as $$
+  delete from member_sessions where token = p_token;
+$$;
+
+create or replace function _member_from_token(p_token uuid)
+returns members
+language sql
+security definer
+as $$
+  select m.* from members m
+  join member_sessions s on s.member_id = m.id
+  where s.token = p_token and s.expires_at > now();
+$$;
+
+-- A member's own attendance/payment history.
+create or replace function get_my_attendance(p_token uuid)
+returns setof attendance
+language sql
+security definer
+as $$
+  select a.* from attendance a
+  where a.member_id = (select id from _member_from_token(p_token))
+  order by a.visit_date desc;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Seller: manage the member list
+-- ---------------------------------------------------------------------
+create or replace function admin_list_members(p_token uuid)
+returns setof members
+language sql
+security definer
+as $$
+  select * from members where company_id = _admin_company(p_token) order by member_number;
+$$;
+
+create or replace function admin_upsert_member(
+  p_token uuid, p_id uuid, p_member_number int, p_name text,
+  p_username text, p_password text, p_daily_amount numeric, p_active boolean
+) returns members
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member members%rowtype;
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+
+  if p_id is null then
+    insert into members(company_id, member_number, name, username, password_hash, daily_amount, active)
+    values (
+      v_company_id, p_member_number, p_name, p_username,
+      crypt(coalesce(p_password, substr(gen_random_uuid()::text, 1, 8)), gen_salt('bf')),
+      coalesce(p_daily_amount, 250), coalesce(p_active, true)
+    )
+    returning * into v_member;
+  else
+    update members set
+      member_number = p_member_number,
+      name = p_name,
+      username = coalesce(p_username, username),
+      password_hash = case when p_password is not null and p_password <> '' then crypt(p_password, gen_salt('bf')) else password_hash end,
+      daily_amount = coalesce(p_daily_amount, daily_amount),
+      active = coalesce(p_active, active)
+    where id = p_id and company_id = v_company_id
+    returning * into v_member;
+  end if;
+  return v_member;
+end;
+$$;
+
+create or replace function admin_delete_member(p_token uuid, p_id uuid)
+returns void
+language sql
+security definer
+as $$
+  delete from members where id = p_id and company_id = _admin_company(p_token);
+$$;
+
+-- ---------------------------------------------------------------------
+-- Seller: mark today's (or any date's) attendance.
+-- p_member_numbers: e.g. ARRAY[1,5,10,15,25,30,50] -- only these get charged.
+-- Idempotent: re-marking someone already marked for that date is a no-op.
+-- ---------------------------------------------------------------------
+create or replace function mark_attendance(p_token uuid, p_date date, p_member_numbers int[])
+returns table(marked int, already int, unknown int)
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_num int;
+  v_member members%rowtype;
+  v_marked int := 0;
+  v_already int := 0;
+  v_unknown int := 0;
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+
+  foreach v_num in array p_member_numbers loop
+    select * into v_member from members where company_id = v_company_id and member_number = v_num and active;
+    if v_member.id is null then
+      v_unknown := v_unknown + 1;
+      continue;
+    end if;
+    begin
+      insert into attendance(company_id, member_id, visit_date, amount)
+      values (v_company_id, v_member.id, p_date, v_member.daily_amount);
+      v_marked := v_marked + 1;
+    exception when unique_violation then
+      v_already := v_already + 1;
+    end;
+  end loop;
+
+  return query select v_marked, v_already, v_unknown;
+end;
+$$;
+
+create or replace function admin_unmark_attendance(p_token uuid, p_date date, p_member_number int)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member_id uuid;
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  select id into v_member_id from members where company_id = v_company_id and member_number = p_member_number;
+  delete from attendance where company_id = v_company_id and member_id = v_member_id and visit_date = p_date;
+end;
+$$;
+
+-- Raw attendance rows for the seller's charts (app aggregates by day/month/year).
+create or replace function admin_get_attendance(p_token uuid, p_days int default 400)
+returns setof attendance
+language sql
+security definer
+as $$
+  select a.* from attendance a
+  where a.company_id = _admin_company(p_token)
+  and a.visit_date >= (current_date - p_days)
+  order by a.visit_date desc;
+$$;
+
+-- Present/absent + amount for every member on one specific date (for the
+-- attendance-marking screen so the seller can see who's already ticked).
+create or replace function admin_attendance_for_date(p_token uuid, p_date date)
+returns table(member_number int, member_name text, present boolean, amount numeric)
+language sql
+security definer
+as $$
+  select m.member_number, m.name,
+    (a.id is not null) as present,
+    coalesce(a.amount, 0) as amount
+  from members m
+  left join attendance a on a.member_id = m.id and a.visit_date = p_date
+  where m.company_id = _admin_company(p_token) and m.active
+  order by m.member_number;
+$$;
+
+-- ---------------------------------------------------------------------
+-- Seed: give the demo company a seller username + a few demo members so
+-- there's something to click around immediately (safe to re-run).
+-- ---------------------------------------------------------------------
+update companies set seller_username = 'demo_seller'
+where slug = 'demo' and seller_username is null;
+
+insert into members (company_id, member_number, name, username, password_hash, daily_amount)
+select c.id, x.member_number, x.name, x.username, crypt(x.password, gen_salt('bf')), 250
+from companies c,
+(values
+  (1, 'Member One',   'member1',  'member123'),
+  (5, 'Member Five',  'member5',  'member123'),
+  (10,'Member Ten',   'member10', 'member123')
+) as x(member_number, name, username, password)
+where c.slug = 'demo'
+and not exists (select 1 from members m where m.company_id = c.id);
+
+-- To add a new company with membership billing:
+--   insert into companies (slug, name, emoji, admin_password_hash, seller_username)
+--   values ('acme', 'Acme Corp', '🍔', crypt('a-real-password', gen_salt('bf')), 'acme_seller');
+-- Then add its members:
+--   insert into members (company_id, member_number, name, username, password_hash, daily_amount)
+--   select id, 1, 'First Member', 'user1', crypt('a-real-password', gen_salt('bf')), 250
+--   from companies where slug = 'acme';

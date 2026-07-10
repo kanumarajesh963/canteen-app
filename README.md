@@ -128,3 +128,54 @@ to change at all — `companies.slug` already is the tenant key.
 - Shop: `/demo`
 - Admin dashboard: `/demo/admin/login`, password `canteen123`
 - Wallet: any phone number "logs in" (no OTP) — try `9876543210`
+
+---
+
+## Membership attendance & daily-collection billing
+
+On top of the shop/wallet system above, this build adds a second, independent feature: a per-company member
+list that pays a flat daily amount (₹250 by default) on days they actually show up — with the seller marking
+attendance and getting day/month/year charts of what was collected vs. what "profit" (unpaid/saved amount)
+that represents.
+
+**This is all in the same `supabase/schema.sql` file** — just run the whole file again in the SQL Editor
+(it's idempotent, so re-running the parts you already ran is harmless) and the new tables/functions/demo data
+appear alongside the existing ones.
+
+### Login, redesigned
+
+- **Seller login** (`/seller/login`) — username + password only, no company name needed. The backend looks
+  up which company that username belongs to. Demo: `demo_seller` / `canteen123`.
+- **Member login** (`/member/login`) — Company name + username + password, all required. Demo: company
+  `demo`, username `member1`, password `member123` (also `member5` / `member10`).
+- The old per-company `/​:slug/admin/login` (password-only) still works too, if you'd rather link people
+  straight to one company.
+
+### How it works day to day
+
+1. Seller logs in → **Members** tab → add each person with a member number, username, password, and daily
+   amount (defaults to ₹250).
+2. Each day, seller logs in → **Attendance** tab → types the member numbers who actually showed up (e.g.
+   `1,5,10,15,25,30,50`) → "Mark present". Only those get charged that day's amount.
+3. The dashboard shows, for that day/month/year: **Potential** (every active member × daily amount),
+   **Collected** (what was actually marked), and **Profit** = Potential − Collected — the amount not paid out
+   because someone didn't come in.
+4. Members can log in themselves to see their own attendance history and how much they've paid this month /
+   all-time.
+
+### Honest limitations of this add-on
+
+- **"Profit" here means "money not paid out,"** not accounting profit against real costs — that's exactly
+  the definition you asked for (50 members × ₹250 = ₹12,500 potential; if only 10 show up, ₹2,500 collected,
+  ₹10,000 "profit"). If you later want true profit (revenue minus your actual costs for that day), that's a
+  different number and would need your cost data wired in separately.
+- **No real payment gateway is behind attendance marking.** Marking someone present just records that
+  ₹250 was collected — it assumes the seller collected it in cash/UPI outside the app. Same caveat as the
+  wallet recharge above: don't treat this as a ledger of money that's actually sitted in a bank account.
+- **Passwords are simple bcrypt-hashed passwords, not full accounts with password reset, email verification,
+  etc.** Fine for an internal tool; add real auth (Supabase Auth) before this handles outside users or real
+  money at scale.
+- **"Potential" assumes daily amount and active member count are roughly stable across the whole period** —
+  if you add/remove members partway through a month, past months' potential is still calculated using
+  *current* active members × days, not who was active on each historical day. Good enough for a first pass;
+  ask if you want it to track membership changes precisely over time.

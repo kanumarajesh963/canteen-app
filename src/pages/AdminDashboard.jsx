@@ -20,6 +20,8 @@ import { useStore } from "../lib/StoreContext";
 import { summarize, dailySeries, monthlySeries, topSellers, categoryBreakdown } from "../lib/analytics";
 import StatCard from "../components/StatCard";
 import ProductModal from "../components/ProductModal";
+import MembersManager from "../components/MembersManager";
+import AttendanceManager from "../components/AttendanceManager";
 
 const PIE_COLORS = ["#4C7A64", "#E8A93B", "#C0472A", "#1F3A2E", "#7C8B85", "#F3C876"];
 const STATUS_FLOW = ["placed", "preparing", "ready", "picked_up"];
@@ -72,6 +74,8 @@ export default function AdminDashboard() {
           ["inventory", "Inventory"],
           ["orders", "Orders"],
           ["counter", "Counter Sale"],
+          ["members", "Members"],
+          ["attendance", "Attendance"],
         ].map(([id, label]) => (
           <button
             key={id}
@@ -102,6 +106,10 @@ export default function AdminDashboard() {
       {tab === "orders" && <Orders orders={orders} setOrderStatus={setOrderStatus} />}
 
       {tab === "counter" && <CounterSale products={products} placeOrder={placeOrder} canFulfill={canFulfill} />}
+
+      {tab === "members" && <MembersManager />}
+
+      {tab === "attendance" && <AttendanceManager />}
 
       {modal && (
         <ProductModal

@@ -19,6 +19,7 @@ export function StoreProvider({ companySlug, children }) {
   const cartKey = `canteen_cart_${companySlug}`;
   const myOrdersKey = `canteen_my_orders_${companySlug}`;
   const adminKey = `canteen_admin_token_${companySlug}`;
+  const memberKey = `canteen_member_token_${companySlug}`;
 
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -36,6 +37,14 @@ export function StoreProvider({ companySlug, children }) {
   const [customerPhone, setCustomerPhone] = useState(() => localStorage.getItem(custKey + "_phone"));
   const [walletBalance, setWalletBalance] = useState(0);
   const [adminToken, setAdminToken] = useState(() => localStorage.getItem(adminKey));
+  const [memberToken, setMemberToken] = useState(() => localStorage.getItem(memberKey));
+  const [memberInfo, setMemberInfo] = useState(() => {
+    try {
+      return JSON.parse(localStorage.getItem(memberKey + "_info")) || null;
+    } catch {
+      return null;
+    }
+  });
   const [myOrderIds, setMyOrderIds] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem(myOrdersKey)) || [];
@@ -57,6 +66,14 @@ export function StoreProvider({ companySlug, children }) {
     if (adminToken) localStorage.setItem(adminKey, adminToken);
     else localStorage.removeItem(adminKey);
   }, [adminToken, adminKey]);
+  useEffect(() => {
+    if (memberToken) localStorage.setItem(memberKey, memberToken);
+    else localStorage.removeItem(memberKey);
+  }, [memberToken, memberKey]);
+  useEffect(() => {
+    if (memberInfo) localStorage.setItem(memberKey + "_info", JSON.stringify(memberInfo));
+    else localStorage.removeItem(memberKey + "_info");
+  }, [memberInfo, memberKey]);
 
   // ---------- initial load: resolve company, products, orders ----------
   const loadAll = useCallback(async () => {
@@ -345,6 +362,108 @@ export function StoreProvider({ companySlug, children }) {
     [products]
   );
 
+  // ---------- seller login (used by the global /seller/login page, which already
+  // resolved the company slug via the seller_login RPC before navigating here) ----------
+  const loginAdminWithToken = useCallback((token) => {
+    setAdminToken(token);
+  }, []);
+
+  // ---------- member (buyer) session ----------
+  const isMember = Boolean(memberToken);
+
+  const loginMemberWithSession = useCallback((session) => {
+    setMemberToken(session.token);
+    setMemberInfo({
+      memberId: session.member_id,
+      memberNumber: session.member_number,
+      name: session.member_name,
+    });
+  }, []);
+
+  const logoutMember = useCallback(async () => {
+    if (memberToken) await supabase.rpc("member_logout", { p_token: memberToken });
+    setMemberToken(null);
+    setMemberInfo(null);
+  }, [memberToken]);
+
+  const myAttendance = useCallback(async () => {
+    if (!memberToken) return [];
+    const { data } = await supabase.rpc("get_my_attendance", { p_token: memberToken });
+    return data || [];
+  }, [memberToken]);
+
+  // ---------- seller: member roster management ----------
+  const listMembers = useCallback(async () => {
+    if (!adminToken) return [];
+    const { data, error } = await supabase.rpc("admin_list_members", { p_token: adminToken });
+    if (error) return [];
+    return data || [];
+  }, [adminToken]);
+
+  const upsertMember = useCallback(
+    async (member) => {
+      const { data, error } = await supabase.rpc("admin_upsert_member", {
+        p_token: adminToken,
+        p_id: member.id || null,
+        p_member_number: member.memberNumber,
+        p_name: member.name || null,
+        p_username: member.username,
+        p_password: member.password || null,
+        p_daily_amount: member.dailyAmount ?? 250,
+        p_active: member.active ?? true,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, member: data };
+    },
+    [adminToken]
+  );
+
+  const deleteMember = useCallback(
+    async (id) => {
+      await supabase.rpc("admin_delete_member", { p_token: adminToken, p_id: id });
+    },
+    [adminToken]
+  );
+
+  // ---------- seller: attendance / daily collection ----------
+  const markAttendance = useCallback(
+    async (date, memberNumbers) => {
+      const { data, error } = await supabase.rpc("mark_attendance", {
+        p_token: adminToken,
+        p_date: date,
+        p_member_numbers: memberNumbers,
+      });
+      if (error || !data || !data[0]) return { ok: false, error: error?.message };
+      return { ok: true, ...data[0] };
+    },
+    [adminToken]
+  );
+
+  const unmarkAttendance = useCallback(
+    async (date, memberNumber) => {
+      await supabase.rpc("admin_unmark_attendance", { p_token: adminToken, p_date: date, p_member_number: memberNumber });
+    },
+    [adminToken]
+  );
+
+  const attendanceForDate = useCallback(
+    async (date) => {
+      if (!adminToken) return [];
+      const { data } = await supabase.rpc("admin_attendance_for_date", { p_token: adminToken, p_date: date });
+      return data || [];
+    },
+    [adminToken]
+  );
+
+  const getAttendanceRecords = useCallback(
+    async (days = 400) => {
+      if (!adminToken) return [];
+      const { data } = await supabase.rpc("admin_get_attendance", { p_token: adminToken, p_days: days });
+      return data || [];
+    },
+    [adminToken]
+  );
+
   const value = useMemo(
     () => ({
       loading,
@@ -372,18 +491,33 @@ export function StoreProvider({ companySlug, children }) {
       reorderItems,
       login,
       logout,
+      loginAdminWithToken,
       loginCustomer,
       logoutCustomer,
       rechargeWallet,
       walletTransactions,
       refreshWallet,
       setOrderStatus,
+      isMember,
+      memberInfo,
+      loginMemberWithSession,
+      logoutMember,
+      myAttendance,
+      listMembers,
+      upsertMember,
+      deleteMember,
+      markAttendance,
+      unmarkAttendance,
+      attendanceForDate,
+      getAttendanceRecords,
     }),
     [
       loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
       walletBalance, lowStockProducts, addToCart, setCartQty, clearCart, addProduct, updateProduct,
       deleteProduct, setStock, adjustStock, placeOrder, canFulfill, reorderItems, login, logout,
-      loginCustomer, logoutCustomer, rechargeWallet, walletTransactions, refreshWallet, setOrderStatus,
+      loginAdminWithToken, loginCustomer, logoutCustomer, rechargeWallet, walletTransactions, refreshWallet,
+      setOrderStatus, isMember, memberInfo, loginMemberWithSession, logoutMember, myAttendance, listMembers,
+      upsertMember, deleteMember, markAttendance, unmarkAttendance, attendanceForDate, getAttendanceRecords,
     ]
   );
 

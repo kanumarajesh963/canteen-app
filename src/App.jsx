@@ -10,6 +10,9 @@ import WalletPage from "./pages/Wallet";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import Landing from "./pages/Landing";
+import SellerLoginGlobal from "./pages/SellerLoginGlobal";
+import MemberLoginGlobal from "./pages/MemberLoginGlobal";
+import MemberHome from "./pages/MemberHome";
 import { StoreProvider, useStore } from "./lib/StoreContext";
 import { supabaseConfigured } from "./lib/supabaseClient";
 
@@ -17,6 +20,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/" element={<Landing />} />
+      <Route path="/seller/login" element={<SellerLoginGlobal />} />
+      <Route path="/member/login" element={<MemberLoginGlobal />} />
       <Route path="/:companySlug/*" element={<CompanyApp />} />
     </Routes>
   );
@@ -84,6 +89,7 @@ function CompanyShell() {
           <Route path="/success/:orderId" element={<Success />} />
           <Route path="/orders" element={<MyOrders />} />
           <Route path="/wallet" element={<WalletPage />} />
+          <Route path="/member" element={<MemberHome />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminDashboard />} />
           <Route path="*" element={<Navigate to="." replace />} />
