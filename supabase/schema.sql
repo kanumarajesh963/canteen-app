@@ -1341,3 +1341,76 @@ begin
   return true;
 end;
 $$;
+
+-- =========================================================================
+-- v5: member login with ONLY email + password (no company field).
+-- =========================================================================
+-- The company is found automatically from the email. Company is only
+-- involved at CREATION time (seller adds the member). Safe to re-run.
+-- =========================================================================
+
+create or replace function member_login_v2(p_email text, p_password text)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype;
+  v_company companies%rowtype;
+  v_token uuid;
+begin
+  -- The same email could exist in more than one company; check the password
+  -- against each match and log into the one it unlocks.
+  for v_member in
+    select m.* from members m
+    where (lower(m.username) = lower(trim(p_email)) or lower(m.email) = lower(trim(p_email)))
+      and m.active
+    order by m.created_at desc
+  loop
+    if v_member.password_hash = crypt(p_password, v_member.password_hash) then
+      select * into v_company from companies where id = v_member.company_id;
+
+      if v_member.email is null and v_member.username ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+        update members set email = lower(trim(v_member.username)) where id = v_member.id;
+      end if;
+
+      insert into member_sessions(member_id) values (v_member.id) returning member_sessions.token into v_token;
+      insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+      return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name;
+      return;
+    end if;
+  end loop;
+  return; -- no match → empty result → "wrong email or password"
+end;
+$$;
+
+-- Forgot password with ONLY the email — company found automatically.
+create or replace function raise_ticket_by_email(p_email text, p_contact text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype;
+begin
+  select m.* into v_member from members m
+  where lower(m.username) = lower(trim(p_email)) or lower(m.email) = lower(trim(p_email))
+  order by m.created_at desc
+  limit 1;
+
+  if v_member.id is null then
+    raise exception 'No account found with that email — check the spelling or ask your seller to add you';
+  end if;
+
+  insert into tickets(company_id, member_id, name, contact, subject, message, type)
+  values (
+    v_member.company_id, v_member.id,
+    coalesce(v_member.name, 'Member #' || v_member.member_number),
+    coalesce(nullif(trim(p_contact), ''), v_member.email, v_member.username),
+    'Password reset — ' || coalesce(v_member.email, v_member.username),
+    'This member forgot their password and requested a reset from the login page.',
+    'password_reset'
+  );
+  return true;
+end;
+$$;

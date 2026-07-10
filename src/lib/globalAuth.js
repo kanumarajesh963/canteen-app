@@ -11,11 +11,11 @@ export async function sellerLoginGlobal(username, password) {
   return data[0]; // { token, company_slug, company_name }
 }
 
-// Member (buyer) logs in with Company name/slug + their own username + password.
-export async function memberLoginGlobal(companyQuery, username, password) {
-  const { data, error } = await supabase.rpc("member_login", {
-    p_company_query: companyQuery,
-    p_username: username,
+// Member (buyer) logs in with ONLY email + password — the backend finds
+// which company the email belongs to automatically.
+export async function memberLoginGlobal(email, password) {
+  const { data, error } = await supabase.rpc("member_login_v2", {
+    p_email: email,
     p_password: password,
   });
   if (error || !data || !data[0] || !data[0].token) return null;

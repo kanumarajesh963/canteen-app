@@ -3,12 +3,11 @@ import { Link } from "react-router-dom";
 import { KeyRound, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase, supabaseConfigured } from "../lib/supabaseClient";
 
-// Forgot password → raises a "password_reset" ticket that the seller sees in
-// their dashboard (Tickets tab). The seller resets the password from the
-// Members tab and shares the new one with the member.
+// Forgot password: just the email — the backend finds which company the
+// account belongs to and raises a password-reset ticket for that seller.
+// The seller resets the password (Members tab) and shares the new one.
 export default function ForgotPassword() {
-  const [company, setCompany] = useState("");
-  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
@@ -20,21 +19,15 @@ export default function ForgotPassword() {
       setError("Backend not connected yet — see README.md → Backend setup.");
       return;
     }
-    if (!company.trim() || !username.trim()) {
-      setError("Company name and your email are required.");
+    if (!email.trim()) {
+      setError("Enter the email you log in with.");
       return;
     }
     setSubmitting(true);
     setError("");
-    const { error: err } = await supabase.rpc("raise_ticket", {
-      p_company_query: company.trim(),
-      p_name: username.trim(),
+    const { error: err } = await supabase.rpc("raise_ticket_by_email", {
+      p_email: email.trim(),
       p_contact: contact.trim() || null,
-      p_subject: `Password reset request — @${username.trim()}`,
-      p_message: `Member "${username.trim()}" forgot their password and is requesting a reset.${
-        contact.trim() ? ` Reach them at: ${contact.trim()}` : ""
-      }`,
-      p_type: "password_reset",
     });
     setSubmitting(false);
     if (err) {
@@ -53,7 +46,7 @@ export default function ForgotPassword() {
           </div>
           <h1 className="font-chalk text-3xl">Forgot password</h1>
           <p className="text-steel text-sm">
-            We'll notify your canteen seller — they'll reset your password and share the new one with you.
+            Enter your login email — your canteen seller will be notified, reset your password, and share the new one with you.
           </p>
         </div>
 
@@ -74,22 +67,15 @@ export default function ForgotPassword() {
         ) : (
           <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
             <div>
-              <label className="text-xs font-mono uppercase text-steel">Company name</label>
-              <input
-                value={company}
-                onChange={(e) => setCompany(e.target.value)}
-                className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-                placeholder="e.g. demo"
-                autoFocus
-              />
-            </div>
-            <div>
               <label className="text-xs font-mono uppercase text-steel">Your email (the one you log in with)</label>
               <input
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
                 placeholder="you@gmail.com"
+                autoFocus
+                required
               />
             </div>
             <div>
