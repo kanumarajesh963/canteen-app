@@ -625,6 +625,12 @@ as $$
   select * from members where company_id = _admin_company(p_token) order by member_number;
 $$;
 
+-- Drop any newer variant first so re-running this whole file on an upgraded
+-- database never hits "cannot change name of input parameter". The final
+-- (correct) version is re-created at the bottom of this file.
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean);
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean, text);
+
 create or replace function admin_upsert_member(
   p_token uuid, p_id uuid, p_member_number int, p_name text,
   p_username text, p_password text, p_daily_amount numeric, p_active boolean
