@@ -20,7 +20,7 @@ export default function MemberLoginGlobal() {
       return;
     }
     if (!companyQuery.trim() || !username.trim() || !password) {
-      setError("Company name, username and password are all required.");
+      setError("Company name, email and password are all required.");
       return;
     }
     setSubmitting(true);
@@ -28,7 +28,7 @@ export default function MemberLoginGlobal() {
     const session = await memberLoginGlobal(companyQuery.trim(), username.trim(), password);
     setSubmitting(false);
     if (!session) {
-      setError("Couldn't find that company/username/password combination.");
+      setError("Couldn't find that company/email/password combination.");
       return;
     }
     localStorage.setItem(`canteen_member_token_${session.company_slug}`, session.token);
@@ -47,7 +47,7 @@ export default function MemberLoginGlobal() {
             <UserCircle2 size={24} />
           </div>
           <h1 className="font-chalk text-3xl">Member Login</h1>
-          <p className="text-steel text-sm">Company name, your username, and password.</p>
+          <p className="text-steel text-sm">Company name, your email, and password.</p>
         </div>
 
         <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
@@ -62,12 +62,12 @@ export default function MemberLoginGlobal() {
             />
           </div>
           <div>
-            <label className="text-xs font-mono uppercase text-steel">Username</label>
+            <label className="text-xs font-mono uppercase text-steel">Email</label>
             <input
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-              placeholder="e.g. member1"
+              placeholder="you@gmail.com"
             />
           </div>
           <div>
@@ -89,7 +89,7 @@ export default function MemberLoginGlobal() {
             Log in
           </button>
           <p className="text-[11px] text-steel font-mono text-center">
-            Demo: company <b>demo</b>, username <b>member1</b>, password <b>member123</b>
+            Demo: company <b>demo</b>, email <b>member1</b>, password <b>member123</b>
           </p>
         </form>
 

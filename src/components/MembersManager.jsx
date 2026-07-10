@@ -24,8 +24,8 @@ export default function MembersManager() {
     <div>
       <div className="flex justify-between items-center mb-4">
         <p className="text-steel text-sm">
-          {members.length} member{members.length === 1 ? "" : "s"}. Give each one a number, username and
-          password — that number is what you'll type in Attendance each day.
+          {members.length} member{members.length === 1 ? "" : "s"}. Give each one a number, email and password.
+          Their email is their login AND where the morning check-in mail goes.
         </p>
         <button
           onClick={() => setModal("new")}
@@ -48,8 +48,7 @@ export default function MembersManager() {
                   <p className="font-semibold text-sm">
                     #{m.member_number} · {m.name || "(no name)"}
                   </p>
-                  <p className="text-xs text-steel font-mono">@{m.username}</p>
-                  {m.email && <p className="text-[11px] text-steel font-mono truncate max-w-[160px]">{m.email}</p>}
+                  <p className="text-xs text-steel font-mono truncate max-w-[170px]">{m.email || m.username}</p>
                 </div>
                 <div className="flex gap-1">
                   <button onClick={() => setModal(m)} className="p-1.5 rounded-lg hover:bg-paper2">
@@ -91,8 +90,7 @@ export default function MembersManager() {
 function MemberModal({ initial, onClose, onSave }) {
   const [memberNumber, setMemberNumber] = useState(initial?.member_number ?? "");
   const [name, setName] = useState(initial?.name ?? "");
-  const [username, setUsername] = useState(initial?.username ?? "");
-  const [email, setEmail] = useState(initial?.email ?? "");
+  const [email, setEmail] = useState(initial?.email ?? initial?.username ?? "");
   const [password, setPassword] = useState("");
   const [dailyAmount, setDailyAmount] = useState(initial?.daily_amount ?? 250);
   const [active, setActive] = useState(initial?.active ?? true);
@@ -100,14 +98,13 @@ function MemberModal({ initial, onClose, onSave }) {
 
   const submit = async (e) => {
     e.preventDefault();
-    if (!memberNumber || !username) return;
+    if (!memberNumber || !email.trim()) return;
     setSaving(true);
     await onSave({
       id: initial?.id,
       memberNumber: Number(memberNumber),
       name,
-      username,
-      email: email.trim() || undefined,
+      email: email.trim(),
       password: password || undefined,
       dailyAmount: Number(dailyAmount),
       active,
@@ -146,11 +143,13 @@ function MemberModal({ initial, onClose, onSave }) {
             />
           </div>
           <div>
-            <label className="text-xs font-mono uppercase text-steel">Username</label>
+            <label className="text-xs font-mono uppercase text-steel">Email (login + morning check-in mail)</label>
             <input
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric"
+              placeholder="member@gmail.com"
               required
             />
           </div>
@@ -159,16 +158,6 @@ function MemberModal({ initial, onClose, onSave }) {
               {initial ? "New password (leave blank to keep current)" : "Password"}
             </label>
             <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required={!initial} />
-          </div>
-          <div>
-            <label className="text-xs font-mono uppercase text-steel">Email (for the morning check-in mail)</label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric"
-              placeholder="member@company.com"
-            />
           </div>
           <div>
             <label className="text-xs font-mono uppercase text-steel">Daily amount (₹)</label>

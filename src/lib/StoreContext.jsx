@@ -493,11 +493,10 @@ export function StoreProvider({ companySlug, children }) {
         p_id: member.id || null,
         p_member_number: member.memberNumber,
         p_name: member.name || null,
-        p_username: member.username,
+        p_email: member.email || null,
         p_password: member.password || null,
         p_daily_amount: member.dailyAmount ?? 250,
         p_active: member.active ?? true,
-        p_email: member.email || null,
       });
       if (error) return { ok: false, error: error.message };
       return { ok: true, member: data };

@@ -21,7 +21,7 @@ export default function ForgotPassword() {
       return;
     }
     if (!company.trim() || !username.trim()) {
-      setError("Company name and username are required.");
+      setError("Company name and your email are required.");
       return;
     }
     setSubmitting(true);
@@ -84,21 +84,21 @@ export default function ForgotPassword() {
               />
             </div>
             <div>
-              <label className="text-xs font-mono uppercase text-steel">Your username</label>
+              <label className="text-xs font-mono uppercase text-steel">Your email (the one you log in with)</label>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-                placeholder="e.g. member1"
+                placeholder="you@gmail.com"
               />
             </div>
             <div>
-              <label className="text-xs font-mono uppercase text-steel">Email or phone (so they can reach you)</label>
+              <label className="text-xs font-mono uppercase text-steel">Phone (optional, so they can reach you)</label>
               <input
                 value={contact}
                 onChange={(e) => setContact(e.target.value)}
                 className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-                placeholder="you@company.com / 98765 43210"
+                placeholder="98765 43210"
               />
             </div>
             {error && <p className="text-brick text-sm">{error}</p>}

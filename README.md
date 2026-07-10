@@ -234,3 +234,25 @@ Replace `YOUR-PROJECT-REF` and `YOUR-SERVICE-ROLE-KEY` (Project Settings → API
 ## If you already ran the old schema
 
 Just paste and run the **whole updated `supabase/schema.sql`** again in the SQL Editor — every statement is idempotent, and the new v3 section at the bottom adds the email column, check-ins, tickets, and login-event tables/functions without touching your existing data.
+
+---
+
+# v4 change: email IS the login
+
+Members no longer have a separate username. The **email they log in with is their identity AND where the morning check-in mail goes** — Gmail, Outlook, any provider (email delivery doesn't care about the provider).
+
+- Seller adds a member with just: number, name, **email**, password (Members tab).
+- Member logs in with: company + **email** + password.
+- If an old member's username already looked like an email, it's auto-copied to the mail list; it also auto-fills the first time they log in.
+- The old demo accounts (`member1` etc.) still work for testing.
+
+## Triggering the morning mail YOURSELF (your own timing)
+
+You said you'll trigger it from your side — perfect. The Edge Function is just a URL; hit it whenever you want and it emails **everyone across all companies** who hasn't been asked yet today (safe to hit twice — already-sent/answered members are skipped):
+
+```bash
+curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/daily-checkin-email" \
+  -H "Authorization: Bearer YOUR-SERVICE-ROLE-KEY"
+```
+
+Trigger it from anywhere: a cron on your machine, the Supabase dashboard's **Invoke** button, Postman, or the pg_cron schedule from the section above if you later want it automatic. Each mail's ✅ **Yes** button charges that member their ₹250 for today; ❌ **No** charges nothing.

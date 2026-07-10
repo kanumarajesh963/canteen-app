@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  CalendarCheck, LogOut, IndianRupee, Mail, KeyRound, LifeBuoy, Loader2, X, CheckCircle2,
+  CalendarCheck, LogOut, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2,
 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import StatCard from "../components/StatCard";
@@ -10,7 +10,7 @@ import PasswordInput from "../components/PasswordInput";
 export default function MemberHome() {
   const {
     isMember, memberInfo, logoutMember, myAttendance, company,
-    myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
+    myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
   } = useStore();
 
   const [records, setRecords] = useState([]);
@@ -101,9 +101,7 @@ export default function MemberHome() {
             <p className="font-semibold text-lg mb-1">Are you coming to the office today?</p>
             <p className="text-paper/70 text-sm mb-4">
               Tapping YES records ₹{checkin?.amount ?? 250} as today's canteen collection.
-              {profile?.email
-                ? " We also email you this every morning."
-                : " Add your email below to get this by mail every morning."}
+              {profile?.email ? ` This question is also mailed to ${profile.email}.` : ""}
             </p>
             <div className="flex gap-3">
               <button
@@ -129,9 +127,6 @@ export default function MemberHome() {
         <StatCard label="This month" value={`₹${thisMonthTotal}`} icon={IndianRupee} tone="sage" />
         <StatCard label="All time" value={`₹${allTimeTotal}`} icon={CalendarCheck} tone="turmeric" />
       </div>
-
-      {/* ---- Email for the morning mail ---- */}
-      <EmailCard profile={profile} setMyEmail={setMyEmail} onSaved={refreshAll} />
 
       {/* ---- Account actions ---- */}
       <div className="grid grid-cols-2 gap-3 mb-6">
@@ -180,82 +175,6 @@ export default function MemberHome() {
 
       {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} changeMyPassword={changeMyPassword} />}
       {showTicket && <RaiseTicketModal onClose={() => setShowTicket(false)} raiseMyTicket={raiseMyTicket} />}
-    </div>
-  );
-}
-
-function EmailCard({ profile, setMyEmail, onSaved }) {
-  const [editing, setEditing] = useState(false);
-  const [email, setEmail] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setEmail(profile?.email || "");
-  }, [profile]);
-
-  const save = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setError("");
-    const res = await setMyEmail(email.trim());
-    setSaving(false);
-    if (!res.ok) {
-      setError(res.error);
-      return;
-    }
-    setEditing(false);
-    onSaved();
-  };
-
-  return (
-    <div className={`rounded-2xl border p-4 sm:p-5 mb-3 ${profile?.email ? "bg-white border-ink/5" : "bg-turmeric/10 border-turmeric/40"}`}>
-      <div className="flex items-start gap-3">
-        <Mail size={18} className="text-turmeric-dark shrink-0 mt-0.5" />
-        <div className="flex-1">
-          <p className="font-semibold text-sm">Morning check-in email</p>
-          {!editing ? (
-            <>
-              <p className="text-xs text-steel mt-0.5">
-                {profile?.email
-                  ? <>Every morning we mail <b>{profile.email}</b> asking if you're coming — one tap answers it.</>
-                  : "Add your email to get the daily \"coming to office?\" mail with one-tap Yes/No buttons."}
-              </p>
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-2 text-xs font-semibold text-turmeric-dark hover:underline"
-              >
-                {profile?.email ? "Change email" : "Add my email"}
-              </button>
-            </>
-          ) : (
-            <form onSubmit={save} className="mt-2 flex flex-col sm:flex-row gap-2">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                className="flex-1 px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric text-sm"
-                autoFocus
-                required
-              />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink text-sm font-semibold px-4 py-2 rounded-full inline-flex items-center gap-1.5"
-                >
-                  {saving && <Loader2 size={13} className="animate-spin" />} Save
-                </button>
-                <button type="button" onClick={() => setEditing(false)} className="text-sm px-3 py-2 rounded-full border border-ink/15 hover:bg-paper2">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          )}
-          {error && <p className="text-brick text-xs mt-1">{error}</p>}
-        </div>
-      </div>
     </div>
   );
 }

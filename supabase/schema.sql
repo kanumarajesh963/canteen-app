@@ -1221,3 +1221,123 @@ begin
   order by co.name;
 end;
 $$;
+
+-- =========================================================================
+-- v4: the member's EMAIL is their login — no separate username.
+-- =========================================================================
+-- Whatever email a member logs in with (gmail, outlook, anything) is the
+-- address the morning check-in mail goes to. Safe to re-run.
+-- =========================================================================
+
+-- Backfill: any existing member whose username already looks like an email
+-- gets it copied into the email column automatically.
+update members set email = lower(username)
+where email is null and username ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$';
+
+-- Login: case-insensitive email/username match. On successful login, if the
+-- identifier looks like an email, it auto-fills the email column — so the
+-- morning-mail list builds itself from logins.
+create or replace function member_login(p_company_query text, p_username text, p_password text)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_company companies%rowtype;
+  v_member members%rowtype;
+  v_token uuid;
+begin
+  select * into v_company from companies
+    where lower(slug) = lower(trim(p_company_query)) or lower(name) = lower(trim(p_company_query))
+    limit 1;
+  if v_company.id is null then
+    return;
+  end if;
+
+  select * into v_member from members
+    where company_id = v_company.id and lower(username) = lower(trim(p_username));
+  if v_member.id is null then
+    return;
+  end if;
+  if v_member.password_hash <> crypt(p_password, v_member.password_hash) then
+    return;
+  end if;
+
+  if v_member.email is null and v_member.username ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    update members set email = lower(trim(v_member.username)) where id = v_member.id;
+  end if;
+
+  insert into member_sessions(member_id) values (v_member.id) returning member_sessions.token into v_token;
+  insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+  return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name;
+end;
+$$;
+
+-- Seller adds a member with just: number, name, EMAIL, password.
+-- The email becomes both the login and the morning-mail address.
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean, text);
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean);
+
+create or replace function admin_upsert_member(
+  p_token uuid, p_id uuid, p_member_number int, p_name text,
+  p_email text, p_password text, p_daily_amount numeric, p_active boolean
+) returns members
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member members%rowtype;
+  v_email text := lower(trim(p_email));
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+
+  if p_id is null then
+    if v_email is null or v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'A valid email is required — it is the member''s login and where the morning mail goes';
+    end if;
+    insert into members(company_id, member_number, name, username, password_hash, daily_amount, active, email)
+    values (
+      v_company_id, p_member_number, p_name, v_email,
+      crypt(coalesce(p_password, substr(gen_random_uuid()::text, 1, 8)), gen_salt('bf')),
+      coalesce(p_daily_amount, 250), coalesce(p_active, true), v_email
+    )
+    returning * into v_member;
+  else
+    if v_email is not null and v_email <> '' and v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'That does not look like a valid email address';
+    end if;
+    update members set
+      member_number = p_member_number,
+      name = p_name,
+      username = coalesce(nullif(v_email, ''), username),
+      email = coalesce(nullif(v_email, ''), email),
+      password_hash = case when p_password is not null and p_password <> '' then crypt(p_password, gen_salt('bf')) else password_hash end,
+      daily_amount = coalesce(p_daily_amount, daily_amount),
+      active = coalesce(p_active, active)
+    where id = p_id and company_id = v_company_id
+    returning * into v_member;
+  end if;
+  return v_member;
+end;
+$$;
+
+-- Changing your email (rarely needed now) also moves your login with it.
+create or replace function member_set_email(p_token uuid, p_email text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype := _member_from_token(p_token);
+  v_email text := lower(trim(p_email));
+begin
+  if v_member.id is null then raise exception 'Not logged in'; end if;
+  if v_email is null or v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'That does not look like a valid email address';
+  end if;
+  update members set email = v_email, username = v_email where id = v_member.id;
+  return true;
+end;
+$$;
