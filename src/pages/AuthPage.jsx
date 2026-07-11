@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import {
-  Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail, ArrowLeft, Lock, Hash, User,
+  Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail, ArrowLeft, Lock, User,
 } from "lucide-react";
 import {
-  memberLoginGlobal, sellerLoginGlobal, sellerSignup, memberSignup, sendOtp,
+  memberLoginGlobal, sellerLoginGlobal, sellerSignup, memberSignup, sendOtp, listCompanies,
   storeAdminSession, storeMemberSession, rememberSession, findActiveSession, setEphemeral,
 } from "../lib/globalAuth";
 import { supabaseConfigured } from "../lib/supabaseClient";
@@ -297,7 +297,22 @@ function MemberSignupFlow({ onBack }) {
   const [otp, setOtp] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [companies, setCompanies] = useState([]);
+  const [companiesLoading, setCompaniesLoading] = useState(true);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    let cancelled = false;
+    listCompanies().then((rows) => {
+      if (!cancelled) {
+        setCompanies(rows);
+        setCompaniesLoading(false);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const begin = async (e) => {
     e.preventDefault();
@@ -361,17 +376,26 @@ function MemberSignupFlow({ onBack }) {
       </div>
       <div>
         <div className="relative">
-          <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
-          <input
+          <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none z-10" />
+          <select
             value={companyCode}
-            onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 10))}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface font-mono tracking-[0.25em]"
-            placeholder="Company code"
+            onChange={(e) => setCompanyCode(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface appearance-none"
             required
-          />
+            disabled={companiesLoading}
+          >
+            <option value="" disabled>
+              {companiesLoading ? "Loading canteens…" : "Select your company"}
+            </option>
+            {companies.map((c) => (
+              <option key={c.slug} value={c.company_code}>
+                {c.emoji ? `${c.emoji} ` : ""}{c.name}
+              </option>
+            ))}
+          </select>
         </div>
         <p className="text-[11px] text-steel mt-1 pl-1">
-          Your canteen seller shares this code (up to 10 characters). (Demo: {DEMO_COMPANY_CODE})
+          Don't see your company? Ask your canteen seller to sign up first. (Demo: Demo Canteen)
         </p>
       </div>
       <div className="relative">

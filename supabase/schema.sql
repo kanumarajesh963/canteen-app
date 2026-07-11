@@ -903,6 +903,13 @@ $$;
 -- ---------------------------------------------------------------------
 -- Member self-service: profile (incl. email), change password
 -- ---------------------------------------------------------------------
+-- Guard: later sections in this file redefine get_my_profile with more
+-- output columns (wallet_balance, then role/khata_eligible). Postgres
+-- won't let CREATE OR REPLACE change a function's OUT-param row type, so
+-- if this file is re-run against a database that already has a NEWER
+-- version of get_my_profile, this drop clears the way. On a brand-new
+-- database this is just a harmless no-op.
+drop function if exists get_my_profile(uuid);
 create or replace function get_my_profile(p_token uuid)
 returns table(member_number int, member_name text, username text, email text, daily_amount numeric)
 language sql
@@ -1815,6 +1822,10 @@ update companies set company_code = _generate_company_code() where company_code 
 --    The OTP reuses the same signup_otps table + send-seller-signup-otp
 --    Edge Function (it just emails a code — purpose-agnostic).
 --    Returns a ready-to-use member session, exactly like member_login_v2.
+-- Guard: a later section redefines this with an extra wallet_balance
+-- output column. Postgres won't let CREATE OR REPLACE change a function's
+-- OUT-param row type, so drop first — harmless no-op on a fresh database.
+drop function if exists member_self_signup(text, text, text, text, text);
 create or replace function member_self_signup(
   p_email text, p_password text, p_name text, p_company_code text, p_otp text
 )

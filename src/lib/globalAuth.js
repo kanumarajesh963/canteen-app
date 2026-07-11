@@ -1,5 +1,17 @@
 import { supabase } from "./supabaseClient";
 
+// Fetches every canteen/company for the "select your company" dropdown
+// on signup. companies_select RLS policy already allows public read
+// (see schema.sql), so this is a plain table select — no RPC needed.
+export async function listCompanies() {
+  const { data, error } = await supabase
+    .from("companies")
+    .select("slug, name, emoji, company_code")
+    .order("name");
+  if (error || !data) return [];
+  return data;
+}
+
 // Seller logs in with just a username + password (no company name needed) —
 // the backend looks up which company that username belongs to.
 export async function sellerLoginGlobal(username, password) {
