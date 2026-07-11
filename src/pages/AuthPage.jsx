@@ -1,23 +1,33 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail, ArrowLeft } from "lucide-react";
+import {
+  Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail, ArrowLeft, Lock, Hash, User,
+} from "lucide-react";
 import {
   memberLoginGlobal, sellerLoginGlobal, sellerSignup, memberSignup, sendOtp,
-  storeAdminSession, storeMemberSession, rememberSession, findActiveSession,
+  storeAdminSession, storeMemberSession, rememberSession, findActiveSession, setEphemeral,
 } from "../lib/globalAuth";
 import { supabaseConfigured } from "../lib/supabaseClient";
 import PasswordInput from "../components/PasswordInput";
 
 // =========================================================================
-// The FIRST SCREEN — kept as simple as a real app's login:
+// The FIRST SCREEN — laid out like a real mobile app's login:
 //
-//   [ email    ]
-//   [ password ]        ← no role choice; we auto-detect member vs seller
-//   (  Sign in  )
-//   Forgot password? · New here? Create account
+//   ┌──────────────────────────────┐
+//   │   dark header band           │
+//   │      (🍱 logo pill)          │
+//   ├──── white rounded sheet ─────┤
+//   │         Welcome!             │
+//   │   ✉  Email Address           │
+//   │   🔒 Password                │
+//   │   ☑ Remember me   Forgot?    │
+//   │   (        Login        )    │
+//   │   New here? Create account   │
+//   │   — or try the demo —        │
+//   └──────────────────────────────┘
 //
-// "Create account" is the ONLY place you choose Member or Seller.
-// Demo accounts sign you in with one tap.
+// One form for everyone — member vs seller is auto-detected on sign-in.
+// The Member/Seller choice only appears when creating an account.
 // =========================================================================
 
 const DEMO_ACCOUNTS = [
@@ -30,19 +40,29 @@ const DEMO_ACCOUNTS = [
 export const DEMO_COMPANY_CODE = "DEMO99";
 
 // Sign in with just email + password — tries member first, then seller,
-// so nobody ever has to say which one they are. Returns { role, session }.
-async function smartLogin(email, password) {
-  const member = await memberLoginGlobal(email, password);
-  if (member) return { role: "member", session: member };
-  const seller = await sellerLoginGlobal(email, password);
-  if (seller) return { role: "seller", session: seller };
+// so nobody ever has to say which one they are.
+async function smartLogin(email, password, prefer = "member") {
+  const attempts =
+    prefer === "seller"
+      ? [
+          ["seller", sellerLoginGlobal],
+          ["member", memberLoginGlobal],
+        ]
+      : [
+          ["member", memberLoginGlobal],
+          ["seller", sellerLoginGlobal],
+        ];
+  for (const [role, fn] of attempts) {
+    const session = await fn(email, password);
+    if (session) return { role, session };
+  }
   return null;
 }
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  // 'signin' | 'choose' | 'signup-member' | 'signup-seller'
-  const [view, setView] = useState("signin");
+  const [view, setView] = useState("signin"); // 'signin' | 'signup'
+  const [roleTab, setRoleTab] = useState("member"); // 'member' | 'seller' — the tabs under Welcome!
 
   // Already logged in? Skip this page entirely.
   useEffect(() => {
@@ -55,38 +75,58 @@ export default function AuthPage() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-10">
-      <div className="max-w-sm w-full">
-        <div className="text-center mb-7">
-          <div className="text-5xl mb-2">🍱</div>
-          <h1 className="font-chalk text-3xl">The Canteen Counter</h1>
-          <p className="text-steel text-sm">
-            {view === "signin" && "Welcome back — sign in to continue."}
-            {view === "choose" && "Let's set you up. Who are you?"}
-            {view === "signup-member" && "Join your office canteen."}
-            {view === "signup-seller" && "Create and run your canteen."}
-          </p>
+    <div className="min-h-screen bg-board bg-chalk-texture flex flex-col">
+      {/* ── Header band with logo pill ─────────────────────────────── */}
+      <div className="pt-12 pb-14 flex justify-center shrink-0">
+        <div className="bg-paper rounded-full pl-2 pr-6 py-2 flex items-center gap-2.5 shadow-lg">
+          <span className="w-10 h-10 rounded-full bg-board flex items-center justify-center text-xl">🍱</span>
+          <span className="font-chalk text-xl text-ink leading-none">The Canteen Counter</span>
         </div>
+      </div>
 
-        {view === "signin" && <SignInView onCreateAccount={() => setView("choose")} />}
-        {view === "choose" && (
-          <ChooseRole
-            onMember={() => setView("signup-member")}
-            onSeller={() => setView("signup-seller")}
-            onBack={() => setView("signin")}
-          />
-        )}
-        {view === "signup-member" && <MemberSignupFlow onBack={() => setView("choose")} />}
-        {view === "signup-seller" && <SellerSignupFlow onBack={() => setView("choose")} />}
+      {/* ── White sheet ────────────────────────────────────────────── */}
+      <div className="flex-1 bg-paper rounded-t-[2.5rem] px-6 pt-10 pb-10 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
+        <div className="max-w-sm mx-auto w-full">
+          <h2 className="text-center text-2xl font-bold mb-5">Welcome!</h2>
 
-        {view !== "signin" && (
-          <p className="text-center text-sm text-steel mt-5">
-            Already have an account?{" "}
-            <button onClick={() => setView("signin")} className="text-turmeric-dark font-semibold hover:underline">
-              Sign in
-            </button>
-          </p>
-        )}
+          {/* Member | Seller tabs — right below Welcome! */}
+          <div className="flex bg-white border border-ink/10 rounded-full p-1 mb-5">
+            {[
+              { id: "member", label: "Member", Icon: UserCircle2 },
+              { id: "seller", label: "Seller", Icon: Store },
+            ].map(({ id, label, Icon }) => (
+              <button
+                key={id}
+                onClick={() => {
+                  setRoleTab(id);
+                  setView("signin");
+                }}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-sm font-semibold transition ${
+                  roleTab === id ? "bg-board text-paper shadow" : "text-steel hover:text-ink"
+                }`}
+              >
+                <Icon size={15} /> {label}
+              </button>
+            ))}
+          </div>
+
+          {view === "signin" ? (
+            <SignInView role={roleTab} onCreateAccount={() => setView("signup")} />
+          ) : roleTab === "member" ? (
+            <MemberSignupFlow onBack={() => setView("signin")} />
+          ) : (
+            <SellerSignupFlow onBack={() => setView("signin")} />
+          )}
+
+          {view === "signup" && (
+            <p className="text-center text-sm text-steel mt-6">
+              Already have an account?{" "}
+              <button onClick={() => setView("signin")} className="text-turmeric-dark font-semibold hover:underline">
+                Sign in
+              </button>
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -95,15 +135,17 @@ export default function AuthPage() {
 // -------------------------------------------------------------------------
 // SIGN IN — one form for everyone. Role is auto-detected.
 // -------------------------------------------------------------------------
-function SignInView({ onCreateAccount }) {
+function SignInView({ role, onCreateAccount }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [demoBusy, setDemoBusy] = useState(null); // email of the demo being signed in
+  const [demoBusy, setDemoBusy] = useState(null);
   const navigate = useNavigate();
 
-  const finishLogin = ({ role, session }) => {
+  const finishLogin = ({ role, session }, rememberMe) => {
+    setEphemeral(!rememberMe); // unchecked "Remember me" → session dies with the browser
     if (role === "member") {
       storeMemberSession(session);
       rememberSession("member", session.company_slug);
@@ -121,10 +163,15 @@ function SignInView({ onCreateAccount }) {
     if (!email.trim() || !password) return setError("Email and password are both required.");
     setSubmitting(true);
     setError("");
-    const result = await smartLogin(email.trim(), password);
+    // Try the selected tab's role first; quietly fall back to the other so
+    // picking the "wrong" tab never locks a valid user out.
+    const result =
+      role === "seller"
+        ? await smartLogin(email.trim(), password, "seller")
+        : await smartLogin(email.trim(), password, "member");
     setSubmitting(false);
     if (!result) return setError("Wrong email or password.");
-    finishLogin(result);
+    finishLogin(result, remember);
   };
 
   const signInAsDemo = async (acc) => {
@@ -134,49 +181,63 @@ function SignInView({ onCreateAccount }) {
     const result = await smartLogin(acc.email, acc.password);
     setDemoBusy(null);
     if (!result) return setError("Demo accounts aren't set up yet — run the latest schema.sql in Supabase.");
-    finishLogin(result);
+    finishLogin(result, true);
   };
 
   return (
     <>
-      <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-        <div>
-          <label className="text-xs font-mono uppercase text-steel">Email</label>
+      <form onSubmit={submit} className="space-y-4">
+        <div className="relative">
+          <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
           <input
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-            placeholder="you@gmail.com"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+            placeholder="Email Address"
             autoFocus
             required
           />
         </div>
-        <div>
-          <label className="text-xs font-mono uppercase text-steel">Password</label>
-          <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
+
+        <PasswordInput icon={Lock} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password" required />
+
+        <div className="flex items-center justify-between text-sm">
+          <label className="flex items-center gap-2 text-steel cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={remember}
+              onChange={(e) => setRemember(e.target.checked)}
+              className="w-4 h-4 rounded border-ink/25 accent-turmeric"
+            />
+            Remember me
+          </label>
+          <Link to="/forgot" className="text-turmeric-dark font-semibold hover:underline">
+            Forgot Password?
+          </Link>
         </div>
-        {error && <p className="text-brick text-sm">{error}</p>}
+
+        {error && <p className="text-brick text-sm text-center">{error}</p>}
+
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
+          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold text-base py-3.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
         >
-          {submitting && <Loader2 size={16} className="animate-spin" />}
-          Sign in
+          {submitting && <Loader2 size={17} className="animate-spin" />}
+          Login
         </button>
-        <div className="flex items-center justify-between text-xs">
-          <Link to="/forgot" className="text-turmeric-dark font-medium hover:underline">
-            Forgot password?
-          </Link>
-          <button type="button" onClick={onCreateAccount} className="text-turmeric-dark font-semibold hover:underline">
-            New here? Create account
-          </button>
-        </div>
       </form>
 
+      <p className="text-center text-sm text-steel mt-5">
+        New here?{" "}
+        <button onClick={onCreateAccount} className="text-turmeric-dark font-semibold hover:underline">
+          Create {role} account
+        </button>
+      </p>
+
       {/* Demo: one tap signs you straight in */}
-      <div className="mt-5">
+      <div className="mt-7">
         <div className="flex items-center gap-3 mb-3">
           <div className="flex-1 h-px bg-ink/10" />
           <span className="text-[11px] font-mono uppercase tracking-widest text-steel">or try the demo</span>
@@ -202,46 +263,11 @@ function SignInView({ onCreateAccount }) {
           ))}
         </div>
       </div>
-    </>
-  );
-}
 
-// -------------------------------------------------------------------------
-// CREATE ACCOUNT — the only place you choose Member or Seller.
-// -------------------------------------------------------------------------
-function ChooseRole({ onMember, onSeller, onBack }) {
-  return (
-    <div className="bg-white rounded-2xl border border-ink/5 p-5">
-      <button onClick={onBack} className="flex items-center gap-1 text-xs text-steel hover:text-ink mb-4">
-        <ArrowLeft size={13} /> Back
-      </button>
-      <div className="space-y-3">
-        <button
-          onClick={onMember}
-          className="w-full flex items-center gap-4 border border-ink/10 hover:border-turmeric rounded-2xl p-4 transition text-left"
-        >
-          <div className="w-11 h-11 rounded-xl bg-sage/10 text-sage flex items-center justify-center shrink-0">
-            <UserCircle2 size={22} />
-          </div>
-          <div>
-            <p className="font-semibold">I'm a member</p>
-            <p className="text-xs text-steel">I eat at my office canteen — I have its company code</p>
-          </div>
-        </button>
-        <button
-          onClick={onSeller}
-          className="w-full flex items-center gap-4 border border-ink/10 hover:border-turmeric rounded-2xl p-4 transition text-left"
-        >
-          <div className="w-11 h-11 rounded-xl bg-turmeric/15 text-turmeric-dark flex items-center justify-center shrink-0">
-            <Store size={22} />
-          </div>
-          <div>
-            <p className="font-semibold">I run a canteen</p>
-            <p className="text-xs text-steel">Create a new canteen and manage its counter</p>
-          </div>
-        </button>
-      </div>
-    </div>
+      <p className="text-center text-[11px] text-steel mt-8">
+        For support, contact your canteen seller from the app after signing in.
+      </p>
+    </>
   );
 }
 
@@ -281,6 +307,7 @@ function MemberSignupFlow({ onBack }) {
     const res = await memberSignup(email.trim(), password, name.trim(), companyCode.trim(), otp.trim());
     setSubmitting(false);
     if (!res.ok) return setError(res.error);
+    setEphemeral(false);
     storeMemberSession(res);
     rememberSession("member", res.company_slug);
     navigate(`/${res.company_slug}/member`);
@@ -307,53 +334,51 @@ function MemberSignupFlow({ onBack }) {
   }
 
   return (
-    <form onSubmit={begin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <TitleRow icon={UserCircle2} title="Create your member account" onBack={onBack} />
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Your name</label>
+    <form onSubmit={begin} className="space-y-4">
+      <TitleRow icon={UserCircle2} title="Create member account" onBack={onBack} />
+      <div className="relative">
+        <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-          placeholder="e.g. Priya Sharma"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          placeholder="Your name"
           autoFocus
         />
       </div>
       <div>
-        <label className="text-xs font-mono uppercase text-steel">Company code</label>
-        <input
-          value={companyCode}
-          onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 6))}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none font-mono tracking-[0.3em] text-center"
-          placeholder="ABC123"
-          required
-        />
-        <p className="text-[11px] text-steel mt-1">Your canteen seller shares this 6-character code. (Demo: {DEMO_COMPANY_CODE})</p>
+        <div className="relative">
+          <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
+          <input
+            value={companyCode}
+            onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 6))}
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white font-mono tracking-[0.25em]"
+            placeholder="Company code"
+            required
+          />
+        </div>
+        <p className="text-[11px] text-steel mt-1 pl-1">
+          Your canteen seller shares this 6-character code. (Demo: {DEMO_COMPANY_CODE})
+        </p>
       </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Email</label>
+      <div className="relative">
+        <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-          placeholder="you@gmail.com"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          placeholder="Email Address"
           required
         />
       </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Password (min 6 chars)</label>
-        <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Confirm password</label>
-        <PasswordInput className="mt-1" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat password" required />
-      </div>
-      {error && <p className="text-brick text-sm">{error}</p>}
+      <PasswordInput icon={Lock} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 chars)" required />
+      <PasswordInput icon={Lock} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm password" required />
+      {error && <p className="text-brick text-sm text-center">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         Send verification code
@@ -399,6 +424,7 @@ function SellerSignupFlow({ onBack }) {
     const res = await sellerSignup(email.trim(), password, companyName.trim(), otp.trim());
     setSubmitting(false);
     if (!res.ok) return setError(res.error);
+    setEphemeral(false);
     storeAdminSession(res);
     rememberSession("seller", res.company_slug);
     setCreated(res);
@@ -407,7 +433,7 @@ function SellerSignupFlow({ onBack }) {
 
   if (step === 3 && created) {
     return (
-      <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center">
+      <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center shadow-sm">
         <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
         <p className="font-semibold mb-1">{created.company_name} is ready 🎉</p>
         <p className="text-steel text-sm mb-4">Share this company code — your members sign up with it:</p>
@@ -425,7 +451,7 @@ function SellerSignupFlow({ onBack }) {
         <p className="text-[11px] text-steel mb-4">{copied ? "Copied ✅" : "Tap the code to copy it."}</p>
         <button
           onClick={() => navigate(`/${created.company_slug}/admin`)}
-          className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-3 rounded-full"
+          className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-bold py-3.5 rounded-xl"
         >
           Go to my dashboard
         </button>
@@ -454,43 +480,37 @@ function SellerSignupFlow({ onBack }) {
   }
 
   return (
-    <form onSubmit={begin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <TitleRow icon={Building2} title="Create your canteen" onBack={onBack} />
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Company name</label>
+    <form onSubmit={begin} className="space-y-4">
+      <TitleRow icon={Building2} title="Create seller account" onBack={onBack} />
+      <div className="relative">
+        <Building2 size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
         <input
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-          placeholder="e.g. Acme Corp Canteen"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          placeholder="Company name (e.g. Acme Corp Canteen)"
           autoFocus
           required
         />
       </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Your email (seller login)</label>
+      <div className="relative">
+        <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
         <input
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-          placeholder="you@gmail.com"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          placeholder="Email Address (your seller login)"
           required
         />
       </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Password (min 6 chars)</label>
-        <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Confirm password</label>
-        <PasswordInput className="mt-1" value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Repeat password" required />
-      </div>
-      {error && <p className="text-brick text-sm">{error}</p>}
+      <PasswordInput icon={Lock} value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Password (min 6 chars)" required />
+      <PasswordInput icon={Lock} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder="Confirm password" required />
+      {error && <p className="text-brick text-sm text-center">{error}</p>}
       <button
         type="submit"
         disabled={submitting}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         Send verification code
@@ -504,7 +524,7 @@ function SellerSignupFlow({ onBack }) {
 // -------------------------------------------------------------------------
 function TitleRow({ icon: Icon, title, onBack }) {
   return (
-    <div className="flex items-center gap-2 text-sm font-semibold text-turmeric-dark -mt-1">
+    <div className="flex items-center gap-2 text-sm font-semibold text-turmeric-dark">
       {onBack && (
         <button type="button" onClick={onBack} className="text-steel hover:text-ink" title="Back">
           <ArrowLeft size={15} />
@@ -518,8 +538,8 @@ function TitleRow({ icon: Icon, title, onBack }) {
 function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, submitLabel, onBack }) {
   const [resent, setResent] = useState(false);
   return (
-    <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <div className="flex items-center gap-2 text-xs text-steel bg-paper2 px-3 py-2 rounded-xl">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="flex items-center gap-2 text-xs text-steel bg-white border border-ink/10 px-3 py-2.5 rounded-xl">
         <Mail size={14} className="shrink-0" />
         <span>
           We mailed a 6-digit code to <b>{email}</b>. It expires in 10 minutes.
@@ -528,17 +548,17 @@ function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, su
       <input
         value={otp}
         onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-        className="w-full px-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none text-center font-mono text-2xl tracking-[0.4em]"
+        className="w-full px-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none text-center font-mono text-2xl tracking-[0.4em] bg-white"
         placeholder="••••••"
         inputMode="numeric"
         autoFocus
         required
       />
-      {error && <p className="text-brick text-sm">{error}</p>}
+      {error && <p className="text-brick text-sm text-center">{error}</p>}
       <button
         type="submit"
         disabled={submitting || otp.length !== 6}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         {submitLabel}

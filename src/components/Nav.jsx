@@ -32,17 +32,17 @@ export default function Nav({ onCartClick }) {
   return (
     <header className="sticky top-0 z-30 bg-board text-paper shadow-md">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link to={base} className="flex items-center gap-2 group">
-          <span className="text-2xl leading-none">{company.emoji}</span>
-          <div className="leading-tight">
-            <div className="font-chalk text-xl sm:text-2xl tracking-wide">{company.name}</div>
+        <Link to={base} className="flex items-center gap-2 group min-w-0 mr-2">
+          <span className="text-2xl leading-none shrink-0">{company.emoji}</span>
+          <div className="leading-tight min-w-0">
+            <div className="font-chalk text-lg sm:text-2xl tracking-wide truncate">{company.name}</div>
             <div className="hidden sm:block text-[11px] font-mono text-turmeric-light/90 tracking-widest uppercase">
               Office Canteen
             </div>
           </div>
         </Link>
 
-        <nav className="flex items-center gap-2 sm:gap-4">
+        <nav className="flex items-center gap-1.5 sm:gap-3 shrink-0">
           {isMember && (
             <NavLink
               to={`${base}/wallet`}

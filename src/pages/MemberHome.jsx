@@ -1,16 +1,15 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  CalendarCheck, LogOut, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply,
+  CalendarCheck, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply,
 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
-import { clearRememberedSession } from "../lib/globalAuth";
 import StatCard from "../components/StatCard";
 import PasswordInput from "../components/PasswordInput";
 
 export default function MemberHome() {
   const {
-    isMember, memberInfo, logoutMember, myAttendance, company,
+    isMember, memberInfo, myAttendance, company,
     myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket, listMyTickets,
   } = useStore();
 
@@ -61,24 +60,11 @@ export default function MemberHome() {
 
   return (
     <div className="max-w-2xl mx-auto px-4 sm:px-6 py-10">
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <h1 className="font-chalk text-3xl">Hi, {memberInfo?.name || `Member #${memberInfo?.memberNumber}`}</h1>
-          <p className="text-steel text-sm font-mono">
-            {company.name} · Member #{memberInfo?.memberNumber}
-          </p>
-        </div>
-        <button
-          onClick={async () => {
-            await logoutMember();
-            localStorage.removeItem(`canteen_member_token_${company.slug}`);
-            localStorage.removeItem(`canteen_member_token_${company.slug}_info`);
-            clearRememberedSession();
-          }}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-ink/15 hover:bg-paper2"
-        >
-          <LogOut size={13} /> Log out
-        </button>
+      <div className="mb-6">
+        <h1 className="font-chalk text-3xl">Hi, {memberInfo?.name || `Member #${memberInfo?.memberNumber}`}</h1>
+        <p className="text-steel text-sm font-mono">
+          {company.name} · Member #{memberInfo?.memberNumber}
+        </p>
       </div>
 
       {/* ---- Today's check-in: same question the morning email asks ---- */}

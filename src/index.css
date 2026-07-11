@@ -8,6 +8,15 @@ html, body, #root { height: 100%; }
 
 body {
   font-family: 'Poppins', sans-serif;
+}
+
+/* Charts (recharts) render SVG text that doesn't inherit the body font —
+   force the same font everywhere so the whole app looks consistent. */
+svg text,
+.recharts-text,
+.recharts-cartesian-axis-tick text,
+.recharts-legend-item-text {
+  font-family: 'Poppins', sans-serif !important;
   background-color: #F6F1E4;
   color: #2B2620;
 }

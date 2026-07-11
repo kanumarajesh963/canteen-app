@@ -15,9 +15,8 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { IndianRupee, TrendingUp, ShoppingBag, PackageMinus, Plus, Pencil, Trash2, LogOut, AlertTriangle } from "lucide-react";
+import { IndianRupee, TrendingUp, ShoppingBag, PackageMinus, Plus, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
-import { clearRememberedSession } from "../lib/globalAuth";
 import { summarize, dailySeries, monthlySeries, topSellers, categoryBreakdown } from "../lib/analytics";
 import StatCard from "../components/StatCard";
 import ProductModal from "../components/ProductModal";
@@ -32,7 +31,7 @@ const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready",
 
 export default function AdminDashboard() {
   const {
-    isAdmin, logout, orders, products, addProduct, updateProduct, deleteProduct, setStock,
+    isAdmin, orders, products, addProduct, updateProduct, deleteProduct, setStock,
     placeOrder, canFulfill, lowStockProducts, setOrderStatus, company,
   } = useStore();
   const [tab, setTab] = useState("overview");
@@ -48,21 +47,9 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="font-chalk text-3xl sm:text-4xl">Seller Dashboard</h1>
-          <p className="text-steel text-sm">Track sales, manage stock, and log counter purchases for {company.name}.</p>
-        </div>
-        <button
-          onClick={async () => {
-            await logout();
-            localStorage.removeItem(`canteen_admin_token_${company.slug}`);
-            clearRememberedSession();
-          }}
-          className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-ink/15 hover:bg-paper2"
-        >
-          <LogOut size={15} /> Log out
-        </button>
+      <div className="mb-4">
+        <h1 className="font-chalk text-3xl sm:text-4xl">Seller Dashboard</h1>
+        <p className="text-steel text-sm">Track sales, manage stock, and log counter purchases for {company.name}.</p>
       </div>
 
       {lowStockProducts.length > 0 && (

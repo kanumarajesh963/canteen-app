@@ -166,3 +166,34 @@ export async function resetPasswordWithOtp(email, otp, newPassword) {
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------
+// "Remember me". Checked (default): sessions persist normally. Unchecked:
+// we mark the login as ephemeral — sessionStorage dies when the browser
+// closes, so on the next visit enforceEphemeralLogout() (called once at
+// app boot, see main.jsx) wipes the tokens and you're back at Sign In.
+// ---------------------------------------------------------------------
+const EPHEMERAL_KEY = "canteen_ephemeral_v1";
+const ALIVE_KEY = "canteen_session_alive_v1";
+
+export function setEphemeral(on) {
+  if (on) {
+    localStorage.setItem(EPHEMERAL_KEY, "1");
+    sessionStorage.setItem(ALIVE_KEY, "1");
+  } else {
+    localStorage.removeItem(EPHEMERAL_KEY);
+  }
+}
+
+export function enforceEphemeralLogout() {
+  if (localStorage.getItem(EPHEMERAL_KEY) !== "1") return;
+  if (sessionStorage.getItem(ALIVE_KEY)) return; // same browser session — keep it
+  const kill = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (/^canteen_(member|admin)_token_/.test(k)) kill.push(k);
+  }
+  kill.forEach((k) => localStorage.removeItem(k));
+  localStorage.removeItem(EPHEMERAL_KEY);
+  localStorage.removeItem("canteen_last_session_v1");
+}
