@@ -1951,3 +1951,252 @@ begin
     set password_hash = excluded.password_hash, active = true,
         name = excluded.name, email = excluded.email;
 end $$;
+
+-- =========================================================================
+-- Member wallet — ₹250 signup bonus + transaction history
+-- =========================================================================
+-- Every member gets a starting wallet balance of ₹250 the moment their
+-- account is created (member_self_signup). This is separate from
+-- `daily_amount` (the per-visit canteen charge used by attendance/checkin) —
+-- wallet_balance is a spendable balance, daily_amount is a per-day price.
+
+alter table members add column if not exists wallet_balance numeric not null default 0;
+
+create table if not exists member_wallet_transactions (
+  id          uuid primary key default gen_random_uuid(),
+  company_id  uuid not null references companies(id) on delete cascade,
+  member_id   uuid not null references members(id) on delete cascade,
+  amount      numeric not null,           -- positive = credit, negative = debit
+  type        text not null,              -- 'signup_bonus', 'admin_credit', 'admin_debit', 'spend'
+  note        text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_member_wallet_txn_member on member_wallet_transactions(member_id);
+
+alter table member_wallet_transactions enable row level security;
+-- No public policies on purpose — same pattern as `members`: only reachable
+-- through security-definer RPC functions below, never directly by anon/auth roles.
+
+-- Re-defines member_self_signup (see earlier definition) to also grant the
+-- ₹250 signup bonus and log it as a wallet transaction.
+create or replace function member_self_signup(
+  p_email text, p_password text, p_name text, p_company_code text, p_otp text
+)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text, wallet_balance numeric)
+language plpgsql
+security definer
+as $$
+declare
+  v_email text := lower(trim(p_email));
+  v_company companies%rowtype;
+  v_otp signup_otps%rowtype;
+  v_number int;
+  v_member members%rowtype;
+  v_token uuid;
+  v_signup_bonus numeric := 250;
+begin
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'A valid email is required';
+  end if;
+  if coalesce(length(p_password), 0) < 6 then
+    raise exception 'Password must be at least 6 characters';
+  end if;
+  if coalesce(trim(p_company_code), '') = '' then
+    raise exception 'Company code is required — ask your canteen seller for it';
+  end if;
+
+  select * into v_company from companies
+  where upper(companies.company_code) = upper(trim(p_company_code));
+  if v_company.id is null then
+    raise exception 'That company code doesn''t match any canteen — double-check it with your seller';
+  end if;
+
+  if exists (
+    select 1 from members m
+    where m.company_id = v_company.id
+      and (lower(m.username) = v_email or lower(m.email) = v_email)
+  ) then
+    raise exception 'An account with that email already exists here — try signing in instead';
+  end if;
+
+  -- OTP is always required for member signup.
+  select * into v_otp from signup_otps
+  where lower(email) = v_email
+    and otp_code = trim(coalesce(p_otp, ''))
+    and not used
+    and expires_at > now()
+  order by created_at desc
+  limit 1;
+  if v_otp.id is null then
+    raise exception 'That code is invalid or has expired — request a new one';
+  end if;
+  update signup_otps set used = true where id = v_otp.id;
+
+  select coalesce(max(m.member_number), 0) + 1 into v_number
+  from members m where m.company_id = v_company.id;
+
+  insert into members(company_id, member_number, name, username, email, password_hash, daily_amount, active, wallet_balance)
+  values (
+    v_company.id, v_number, nullif(trim(p_name), ''), v_email, v_email,
+    crypt(p_password, gen_salt('bf')), 250, true, v_signup_bonus
+  )
+  returning * into v_member;
+
+  insert into member_wallet_transactions(company_id, member_id, amount, type, note)
+  values (v_company.id, v_member.id, v_signup_bonus, 'signup_bonus', 'Welcome bonus on joining ' || v_company.name);
+
+  insert into member_sessions(member_id) values (v_member.id)
+  returning member_sessions.token into v_token;
+  insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+
+  return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name, v_member.wallet_balance;
+end;
+$$;
+
+-- Re-defines get_my_profile to also return the wallet balance.
+create or replace function get_my_profile(p_token uuid)
+returns table(member_number int, member_name text, username text, email text, daily_amount numeric, wallet_balance numeric)
+language sql
+security definer
+as $$
+  select m.member_number, m.name, m.username, m.email, m.daily_amount, m.wallet_balance
+  from _member_from_token(p_token) m
+  where m.id is not null;
+$$;
+
+-- Member's own wallet transaction history (mirrors get_wallet_transactions
+-- for the phone/customer flow, but scoped to the logged-in member's token).
+create or replace function get_my_wallet_transactions(p_token uuid)
+returns setof member_wallet_transactions
+language sql
+security definer
+as $$
+  select wt.* from member_wallet_transactions wt
+  join _member_from_token(p_token) m on m.id = wt.member_id
+  order by wt.created_at desc
+  limit 100;
+$$;
+
+-- =========================================================================
+-- Khata — the village-shop credit tab. A member can take items "on credit"
+-- instead of paying immediately; the seller logs product + price, and it
+-- adds up into a running due balance per member. Seller can settle
+-- (mark paid) any time. Tracked per company, so with many members the
+-- seller gets one dashboard of everyone's outstanding tab.
+-- =========================================================================
+
+create table if not exists khata_entries (
+  id           uuid primary key default gen_random_uuid(),
+  company_id   uuid not null references companies(id) on delete cascade,
+  member_id    uuid not null references members(id) on delete cascade,
+  product_name text not null,
+  price        numeric not null check (price > 0),
+  qty          int not null default 1 check (qty > 0),
+  status       text not null default 'due' check (status in ('due', 'settled')),
+  note         text,
+  created_at   timestamptz not null default now(),
+  settled_at   timestamptz
+);
+create index if not exists idx_khata_company on khata_entries(company_id);
+create index if not exists idx_khata_member on khata_entries(member_id);
+create index if not exists idx_khata_status on khata_entries(company_id, status);
+
+alter table khata_entries enable row level security;
+-- No public policies — same pattern as `members`/`member_wallet_transactions`:
+-- only reachable through the security-definer RPC functions below.
+
+-- Seller: log a new khata entry for one of their members.
+create or replace function admin_add_khata_entry(
+  p_token uuid, p_member_id uuid, p_product_name text, p_price numeric, p_qty int default 1, p_note text default null
+)
+returns khata_entries
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _admin_company(p_token);
+  v_row khata_entries%rowtype;
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if coalesce(trim(p_product_name), '') = '' then raise exception 'Product name is required'; end if;
+  if p_price is null or p_price <= 0 then raise exception 'Price must be greater than 0'; end if;
+  if not exists (select 1 from members where id = p_member_id and company_id = v_company_id) then
+    raise exception 'That member does not belong to your company';
+  end if;
+
+  insert into khata_entries(company_id, member_id, product_name, price, qty, note)
+  values (v_company_id, p_member_id, trim(p_product_name), p_price, coalesce(p_qty, 1), nullif(trim(coalesce(p_note, '')), ''))
+  returning * into v_row;
+
+  return v_row;
+end;
+$$;
+
+-- Seller: per-member outstanding totals for the whole company (the "khata
+-- book" view — one row per member who has ever had an entry).
+create or replace function admin_khata_summary(p_token uuid)
+returns table(
+  member_id uuid, member_number int, member_name text, member_email text,
+  due_total numeric, due_count int, last_entry_at timestamptz
+)
+language sql
+security definer
+as $$
+  select
+    m.id, m.member_number, m.name, m.email,
+    coalesce(sum(k.price * k.qty) filter (where k.status = 'due'), 0) as due_total,
+    count(k.id) filter (where k.status = 'due')::int as due_count,
+    max(k.created_at) as last_entry_at
+  from members m
+  join khata_entries k on k.member_id = m.id
+  where m.company_id = _admin_company(p_token)
+  group by m.id, m.member_number, m.name, m.email
+  having coalesce(sum(k.price * k.qty) filter (where k.status = 'due'), 0) > 0
+  order by due_total desc;
+$$;
+
+-- Seller: full entry list for one member (their itemized tab).
+create or replace function admin_khata_entries(p_token uuid, p_member_id uuid)
+returns setof khata_entries
+language sql
+security definer
+as $$
+  select k.* from khata_entries k
+  where k.member_id = p_member_id and k.company_id = _admin_company(p_token)
+  order by k.created_at desc;
+$$;
+
+-- Seller: mark a member's outstanding entries as settled (they paid their tab).
+create or replace function admin_settle_khata(p_token uuid, p_member_id uuid)
+returns int
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _admin_company(p_token);
+  v_count int;
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  update khata_entries
+  set status = 'settled', settled_at = now()
+  where member_id = p_member_id and company_id = v_company_id and status = 'due';
+  get diagnostics v_count = row_count;
+  return v_count;
+end;
+$$;
+
+-- Member: their own current tab (used on the member home page).
+create or replace function get_my_khata(p_token uuid)
+returns table(due_total numeric, entries json)
+language sql
+security definer
+as $$
+  select
+    coalesce(sum(k.price * k.qty) filter (where k.status = 'due'), 0),
+    coalesce(json_agg(json_build_object(
+      'id', k.id, 'product_name', k.product_name, 'price', k.price, 'qty', k.qty,
+      'status', k.status, 'created_at', k.created_at
+    ) order by k.created_at desc) filter (where k.status = 'due'), '[]'::json)
+  from khata_entries k
+  join _member_from_token(p_token) m on m.id = k.member_id;
+$$;

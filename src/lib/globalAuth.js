@@ -86,6 +86,21 @@ export async function memberSignup(email, password, name, companyCode, otp) {
   if (error) return { ok: false, error: error.message };
   const row = data?.[0];
   if (!row?.token) return { ok: false, error: "Something went wrong — try again." };
+
+  // Fire-and-forget: the ₹250 wallet bonus already happened server-side
+  // inside member_self_signup. This just emails a confirmation to the
+  // address the member entered. If it fails, signup still succeeds.
+  supabase.functions
+    .invoke("send-welcome-email", {
+      body: {
+        email: email.trim(),
+        name: row.member_name,
+        companyName: row.company_name,
+        memberNumber: row.member_number,
+      },
+    })
+    .catch(() => {});
+
   return { ok: true, ...row };
 }
 

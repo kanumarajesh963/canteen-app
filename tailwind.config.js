@@ -5,9 +5,9 @@ export default {
     extend: {
       colors: {
         board: {
-          DEFAULT: "#1F3A2E",
-          light: "#2C4F3E",
-          dark: "#152A21",
+          DEFAULT: "#262A3B",
+          light: "#343A52",
+          dark: "#1A1D2A",
         },
         paper: "#F6F1E4",
         paper2: "#EFE7D2",
@@ -21,8 +21,8 @@ export default {
           DEFAULT: "#C0472A",
           dark: "#9A3620",
         },
-        steel: "#7C8B85",
-        sage: "#4C7A64",
+        steel: "#83807A",
+        sage: "#3D6EA5",
       },
       fontFamily: {
         sans: ["'Poppins'", "sans-serif"],

@@ -197,7 +197,8 @@ Everything except *sending scheduled emails* runs on the existing Supabase setup
 
 **A. Get a free email API key (Resend)**
 1. Sign up at [resend.com](https://resend.com) (free: 100 emails/day).
-2. Create an API key. For testing you can send from `onboarding@resend.dev` immediately; verify your own domain later for production.
+2. Create an API key.
+3. **Verify a domain before going live** — go to [resend.com/domains](https://resend.com/domains), add a domain you control, and add the SPF/DKIM DNS records it gives you (usually verifies in minutes). Until you do this, `onboarding@resend.dev` **only delivers to the email address on your own Resend account** — every other recipient silently fails or gets a 403. This is the #1 cause of "OTP/welcome emails only reach one inbox." Once verified, set `FROM_EMAIL` to use your domain (e.g. `Corporate Canteen <noreply@yourdomain.com>`) and every member's real email will start receiving mail correctly.
 
 **B. Deploy the Edge Function**
 1. In your Supabase project: **Edge Functions → Deploy a new function**, name it `daily-checkin-email`, and paste the contents of [`supabase/functions/daily-checkin-email/index.ts`](./supabase/functions/daily-checkin-email/index.ts). (Or use the CLI: `supabase functions deploy daily-checkin-email`.)
@@ -283,6 +284,18 @@ Every new row in `tickets` (a member's "Raise a ticket", a password-reset reques
 `/member/forgot` now: enter your email → get a 6-digit code → enter the code + a new password → done, immediately. The old flow (raise a ticket, seller resets it manually) still exists as a fallback at `/member/forgot/ask-seller` for members who can't access their inbox.
 
 **Setup:** deploy `supabase/functions/send-password-otp/index.ts` as an Edge Function named `send-password-otp`, with the same `RESEND_API_KEY` / `FROM_EMAIL` secrets, deployed with `--no-verify-jwt` (no one is logged in yet at this point). That's it — the RPCs are already in `schema.sql`.
+
+## Member wallet signup bonus + welcome email
+
+Every member now gets a **₹250 wallet bonus** automatically the moment they sign up (`member_self_signup` in `schema.sql` credits it and logs it in `member_wallet_transactions`). Their home page shows the balance as a "Wallet" stat card.
+
+Right after signup, the app also emails the member a welcome message confirming the bonus, sent to whatever address *they* entered (not a fixed address).
+
+**Setup:** deploy `supabase/functions/send-welcome-email/index.ts` as an Edge Function named `send-welcome-email`, using the same `RESEND_API_KEY` / `FROM_EMAIL` secrets as the other functions, deployed with `--no-verify-jwt`:
+```
+supabase functions deploy send-welcome-email --no-verify-jwt
+```
+If this function isn't deployed yet, signup still works fine — the wallet credit happens in the database regardless; only the confirmation email is skipped.
 
 ## 3. Seller signup — "Create your company" (`/seller/signup`)
 

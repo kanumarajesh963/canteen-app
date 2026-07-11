@@ -24,8 +24,9 @@ import MembersManager from "../components/MembersManager";
 import AttendanceManager from "../components/AttendanceManager";
 import TicketsManager from "../components/TicketsManager";
 import LoginStats from "../components/LoginStats";
+import KhataManager from "../components/KhataManager";
 
-const PIE_COLORS = ["#4C7A64", "#E8A93B", "#C0472A", "#1F3A2E", "#7C8B85", "#F3C876"];
+const PIE_COLORS = ["#3D6EA5", "#E8A93B", "#C0472A", "#262A3B", "#83807A", "#F3C876"];
 const STATUS_FLOW = ["placed", "preparing", "ready", "picked_up"];
 const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready", picked_up: "Picked up" };
 
@@ -69,6 +70,7 @@ export default function AdminDashboard() {
           ["orders", "Orders"],
           ["counter", "Counter Sale"],
           ["members", "Members"],
+          ["khata", "Khata"],
           ["attendance", "Attendance"],
           ["logins", "Logins"],
           ["tickets", "Tickets"],
@@ -104,6 +106,8 @@ export default function AdminDashboard() {
       {tab === "counter" && <CounterSale products={products} placeOrder={placeOrder} canFulfill={canFulfill} />}
 
       {tab === "members" && <MembersManager />}
+
+      {tab === "khata" && <KhataManager />}
 
       {tab === "attendance" && <AttendanceManager />}
 

@@ -75,17 +75,20 @@ export default function AuthPage() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-board bg-chalk-texture flex flex-col">
-      {/* ── Header band with logo pill (kept short — no scrolling) ──── */}
-      <div className="pt-7 pb-10 flex justify-center shrink-0">
-        <div className="bg-paper rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-2 shadow-lg">
-          <span className="w-8 h-8 rounded-full bg-board flex items-center justify-center text-base">🍱</span>
-          <span className="font-chalk text-lg text-ink leading-none">The Canteen Counter</span>
+    <div className="min-h-screen bg-paper flex flex-col page-enter">
+      {/* ── Logo row — plain white, no dark band ─────────────────────── */}
+      <div className="pt-8 pb-2 flex justify-center shrink-0">
+        <div className="bg-white border border-ink/10 rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-2 shadow-sm">
+          <span className="w-8 h-8 rounded-full bg-turmeric flex items-center justify-center text-base">🍱</span>
+          <span className="font-chalk text-lg text-ink leading-none">Corporate Canteen</span>
         </div>
       </div>
 
-      {/* ── White sheet ────────────────────────────────────────────── */}
-      <div className="flex-1 bg-paper rounded-t-[2rem] px-6 pt-7 pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
+      {/* ── About-the-app: short rotating highlights, not a heavy hero ── */}
+      <AboutStrip />
+
+      {/* ── Form area — same white background, no separate "sheet" ──── */}
+      <div className="flex-1 px-6 pt-4 pb-8">
         <div className="max-w-sm mx-auto w-full">
           {view === "signin" && (
             <>
@@ -108,6 +111,37 @@ export default function AuthPage() {
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------------------------------------------------------------
+// ABOUT STRIP — a small, auto-rotating one-liner introducing what the app
+// does, so a first-time visitor understands it in 3 seconds without a full
+// marketing page. Pure CSS/JS, no extra libraries.
+// -------------------------------------------------------------------------
+const APP_HIGHLIGHTS = [
+  { icon: "🍱", text: "Order canteen food from your phone — no queue." },
+  { icon: "💳", text: "A wallet + khata for every member, tracked automatically." },
+  { icon: "📅", text: "Daily attendance & check-ins, synced with your canteen bill." },
+  { icon: "🏢", text: "Built for companies — every canteen's data stays private." },
+];
+
+function AboutStrip() {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => (n + 1) % APP_HIGHLIGHTS.length), 3200);
+    return () => clearInterval(id);
+  }, []);
+  const current = APP_HIGHLIGHTS[i];
+  return (
+    <div className="flex justify-center px-6 pb-3 shrink-0">
+      <div className="max-w-sm w-full bg-turmeric/10 border border-turmeric/25 rounded-2xl px-4 py-2.5 flex items-center gap-2.5 min-h-[52px]">
+        <span key={i} className="text-lg animate-pop-in shrink-0">{current.icon}</span>
+        <p key={`t-${i}`} className="text-xs sm:text-sm text-ink/80 font-medium animate-fade-in leading-snug">
+          {current.text}
+        </p>
       </div>
     </div>
   );
@@ -419,10 +453,10 @@ function SellerSignupFlow({ onBack }) {
             setCopied(true);
             setTimeout(() => setCopied(false), 1500);
           }}
-          className="w-full bg-board text-paper rounded-2xl py-4 mb-2 font-mono text-2xl tracking-[0.3em] flex items-center justify-center gap-3"
+          className="w-full bg-turmeric/15 border-2 border-dashed border-turmeric text-ink rounded-2xl py-4 mb-2 font-mono text-2xl tracking-[0.3em] flex items-center justify-center gap-3"
           title="Tap to copy"
         >
-          {created.company_code} <Copy size={16} className="text-turmeric" />
+          {created.company_code} <Copy size={16} className="text-turmeric-dark" />
         </button>
         <p className="text-[11px] text-steel mb-4">{copied ? "Copied ✅" : "Tap the code to copy it."}</p>
         <button

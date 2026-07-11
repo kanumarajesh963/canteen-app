@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  CalendarCheck, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply,
+  CalendarCheck, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply, Wallet, BookText,
 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import StatCard from "../components/StatCard";
@@ -10,7 +10,7 @@ import PasswordInput from "../components/PasswordInput";
 export default function MemberHome() {
   const {
     isMember, memberInfo, myAttendance, company,
-    myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket, listMyTickets,
+    myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket, listMyTickets, myKhata,
   } = useStore();
 
   const [records, setRecords] = useState([]);
@@ -21,13 +21,17 @@ export default function MemberHome() {
   const [showPassword, setShowPassword] = useState(false);
   const [showTicket, setShowTicket] = useState(false);
   const [myTickets, setMyTickets] = useState([]);
+  const [khata, setKhata] = useState({ due_total: 0, entries: [] });
 
   const refreshAll = async () => {
-    const [r, p, c, t] = await Promise.all([myAttendance(), myProfile(), checkinStatusToday(), listMyTickets()]);
+    const [r, p, c, t, k] = await Promise.all([
+      myAttendance(), myProfile(), checkinStatusToday(), listMyTickets(), myKhata(),
+    ]);
     setRecords(r);
     setProfile(p);
     setCheckin(c);
     setMyTickets(t);
+    setKhata(k);
     setLoading(false);
   };
 
@@ -117,10 +121,25 @@ export default function MemberHome() {
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
+        <StatCard label="Wallet" value={`₹${profile?.wallet_balance ?? 0}`} icon={Wallet} tone="turmeric" />
         <StatCard label="This month" value={`₹${thisMonthTotal}`} icon={IndianRupee} tone="sage" />
-        <StatCard label="All time" value={`₹${allTimeTotal}`} icon={CalendarCheck} tone="turmeric" />
+        <StatCard label="All time" value={`₹${allTimeTotal}`} icon={CalendarCheck} tone="sage" />
       </div>
+
+      {khata.due_total > 0 && (
+        <div className="bg-brick/10 border border-brick/20 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <BookText size={20} className="text-brick shrink-0" />
+            <div className="min-w-0">
+              <p className="font-semibold text-sm text-brick">Khata due: ₹{khata.due_total}</p>
+              <p className="text-xs text-steel truncate">
+                {khata.entries.length} item{khata.entries.length === 1 ? "" : "s"} on your tab — settle up with your seller.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---- Account actions ---- */}
       <div className="grid grid-cols-2 gap-3 mb-6">

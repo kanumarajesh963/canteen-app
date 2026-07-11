@@ -572,6 +572,57 @@ export function StoreProvider({ companySlug, children }) {
     [adminToken]
   );
 
+  // ---------- seller: khata (credit tab) ----------
+  const khataSummary = useCallback(async () => {
+    if (!adminToken) return [];
+    const { data, error } = await supabase.rpc("admin_khata_summary", { p_token: adminToken });
+    if (error) return [];
+    return data || [];
+  }, [adminToken]);
+
+  const khataEntriesFor = useCallback(
+    async (memberId) => {
+      if (!adminToken) return [];
+      const { data, error } = await supabase.rpc("admin_khata_entries", { p_token: adminToken, p_member_id: memberId });
+      if (error) return [];
+      return data || [];
+    },
+    [adminToken]
+  );
+
+  const addKhataEntry = useCallback(
+    async (memberId, productName, price, qty = 1, note = null) => {
+      const { data, error } = await supabase.rpc("admin_add_khata_entry", {
+        p_token: adminToken,
+        p_member_id: memberId,
+        p_product_name: productName,
+        p_price: price,
+        p_qty: qty,
+        p_note: note,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, entry: data };
+    },
+    [adminToken]
+  );
+
+  const settleKhata = useCallback(
+    async (memberId) => {
+      const { data, error } = await supabase.rpc("admin_settle_khata", { p_token: adminToken, p_member_id: memberId });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, settledCount: data };
+    },
+    [adminToken]
+  );
+
+  // ---------- member: my own khata tab ----------
+  const myKhata = useCallback(async () => {
+    if (!memberToken) return { due_total: 0, entries: [] };
+    const { data, error } = await supabase.rpc("get_my_khata", { p_token: memberToken });
+    if (error || !data?.[0]) return { due_total: 0, entries: [] };
+    return { due_total: Number(data[0].due_total) || 0, entries: data[0].entries || [] };
+  }, [memberToken]);
+
   // ---------- seller: attendance / daily collection ----------
   const markAttendance = useCallback(
     async (date, memberNumbers) => {
@@ -671,6 +722,11 @@ export function StoreProvider({ companySlug, children }) {
       unmarkAttendance,
       attendanceForDate,
       getAttendanceRecords,
+      khataSummary,
+      khataEntriesFor,
+      addKhataEntry,
+      settleKhata,
+      myKhata,
     }),
     [
       loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
@@ -681,7 +737,7 @@ export function StoreProvider({ companySlug, children }) {
       upsertMember, deleteMember, markAttendance, unmarkAttendance, attendanceForDate, getAttendanceRecords,
       myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
       listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
-      loginStats, allCompanyLoginCounts,
+      loginStats, allCompanyLoginCounts, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
     ]
   );
 

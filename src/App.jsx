@@ -72,8 +72,12 @@ function CompanyShell() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="font-mono text-steel text-sm animate-pulse">Loading the counter…</p>
+      <div className="min-h-screen flex items-center justify-center px-6">
+        <div className="max-w-sm w-full space-y-3">
+          <div className="skeleton h-6 w-2/3 mx-auto" />
+          <div className="skeleton h-32 w-full" />
+          <div className="skeleton h-4 w-1/2 mx-auto" />
+        </div>
       </div>
     );
   }
@@ -101,7 +105,7 @@ function CompanyShell() {
     <div className="min-h-screen flex flex-col">
       <Nav onCartClick={() => setCartOpen(true)} />
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} />
-      <main className="flex-1">
+      <main className="flex-1 page-enter">
         <Routes>
           <Route path="/" element={<Shop />} />
           <Route path="/checkout" element={<Checkout />} />
@@ -116,7 +120,7 @@ function CompanyShell() {
         </Routes>
       </main>
       <footer className="text-center text-xs text-steel font-mono py-6">
-        {company.name} · powered by The Canteen Counter
+        {company.name} · powered by Corporate Canteen
       </footer>
     </div>
   );
