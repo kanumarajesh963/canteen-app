@@ -2766,3 +2766,39 @@ begin
         role          = 'fullaccess',
         active        = true;
 end $$;
+
+-- =========================================================================
+-- v13 — Cross-company member drill-down for admins (owner-operated deploy).
+-- =========================================================================
+-- The original design kept per-member details scoped to the caller's own
+-- company (admin_member_login_details). This deployment is single-owner, so
+-- the owner/admin is allowed to open ANY company's member login details from
+-- the "Logins per company" table — not just their own.
+--
+-- Still requires a valid admin session (any company) — it is not public.
+-- Takes the target company by slug. Same columns as the own-company version.
+--
+-- NOTE: only enable this when a single organization owns the whole
+-- deployment. If independent companies share it as tenants, this would let
+-- each company's admin see the others' members.
+-- =========================================================================
+create or replace function admin_company_member_details(p_token uuid, p_company_slug text)
+returns table(
+  member_id uuid, member_number int, member_name text, email text, active boolean,
+  last_login timestamptz, logins_today bigint, logins_total bigint
+)
+language sql
+security definer
+as $$
+  select
+    m.id, m.member_number, m.name, m.email, m.active,
+    (select max(le.created_at) from login_events le where le.member_id = m.id and le.kind = 'member'),
+    (select count(*) from login_events le where le.member_id = m.id and le.kind = 'member' and le.created_at::date = current_date),
+    (select count(*) from login_events le where le.member_id = m.id and le.kind = 'member')
+  from members m
+  join companies c on c.id = m.company_id
+  -- gate: caller must hold a valid admin session (of any company)
+  where _admin_company(p_token) is not null
+    and c.slug = p_company_slug
+  order by m.member_number;
+$$;

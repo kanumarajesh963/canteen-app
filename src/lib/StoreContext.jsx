@@ -585,6 +585,18 @@ export function StoreProvider({ companySlug, children }) {
     return data || [];
   }, [adminToken]);
 
+  // Per-member drill-down for ANY company (owner-operated deploy). Requires a
+  // valid admin session server-side; returns the requested company's members.
+  const companyMemberLoginDetails = useCallback(async (slug) => {
+    if (!adminToken || !slug) return [];
+    const { data, error } = await supabase.rpc("admin_company_member_details", {
+      p_token: adminToken,
+      p_company_slug: slug,
+    });
+    if (error) return [];
+    return data || [];
+  }, [adminToken]);
+
   // ---------- seller: member roster management ----------
   const listMembers = useCallback(async () => {
     if (!adminToken) return [];
@@ -841,6 +853,7 @@ export function StoreProvider({ companySlug, children }) {
       loginStats,
       allCompanyLoginCounts,
       memberLoginDetails,
+      companyMemberLoginDetails,
       listMembers,
       upsertMember,
       deleteMember,
@@ -872,7 +885,7 @@ export function StoreProvider({ companySlug, children }) {
       upsertMember, deleteMember, markAttendance, unmarkAttendance, attendanceForDate, getAttendanceRecords,
       myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
       listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
-      loginStats, allCompanyLoginCounts, memberLoginDetails, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
+      loginStats, allCompanyLoginCounts, memberLoginDetails, companyMemberLoginDetails, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
       memberProfile, placeOrderKhata, hrListMembers, hrResetMemberPassword, hrAttendance, hrLoginStats,
       hrSetKhataEligible, hrSetMemberActive, hrSetMemberRole,
     ]

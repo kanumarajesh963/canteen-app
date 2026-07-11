@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Users, LogIn, CalendarDays, Sigma, X, Lock } from "lucide-react";
+import { Users, LogIn, CalendarDays, Sigma, X } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import StatCard from "./StatCard";
 
@@ -7,14 +7,14 @@ import StatCard from "./StatCard";
 // per-company table ("for every company, how many people logged in").
 // Counts only — no names or details from other companies are exposed.
 export default function LoginStats() {
-  const { loginStats, allCompanyLoginCounts, memberLoginDetails, company } = useStore();
+  const { loginStats, allCompanyLoginCounts, companyMemberLoginDetails, company } = useStore();
   const [stats, setStats] = useState(null);
   const [companies, setCompanies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [members, setMembers] = useState([]);
-  const [otherCompanyNote, setOtherCompanyNote] = useState(false);
+  const [detailCompany, setDetailCompany] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -25,21 +25,14 @@ export default function LoginStats() {
     })();
   }, [loginStats, allCompanyLoginCounts]);
 
-  const openOwnCompanyDetails = async () => {
+  // Any company's row opens its member details (owner-operated deployment).
+  const openCompanyDetails = async (c) => {
+    setDetailCompany({ name: c.company_name, slug: c.company_slug });
     setDetailOpen(true);
     setDetailLoading(true);
-    const rows = await memberLoginDetails();
+    const rows = await companyMemberLoginDetails(c.company_slug);
     setMembers(rows);
     setDetailLoading(false);
-  };
-
-  const handleRowClick = (slug) => {
-    if (slug === company.slug) {
-      openOwnCompanyDetails();
-    } else {
-      setOtherCompanyNote(true);
-      setTimeout(() => setOtherCompanyNote(false), 3500);
-    }
   };
 
   if (loading) return <p className="text-steel text-sm py-10 text-center">Loading…</p>;
@@ -59,17 +52,9 @@ export default function LoginStats() {
       <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-1">Logins per company</h3>
         <p className="text-xs text-steel mb-4">
-          How many people logged in, for every company on this deployment (counts only).
-          Click your own company's row to see per-member details.
+          How many people logged in, for every company on this deployment.
+          Click any company's row to see its per-member details.
         </p>
-        {otherCompanyNote && (
-          <div className="mb-3 text-xs bg-ink/5 border border-ink/10 rounded-lg px-3 py-2 flex items-center gap-2">
-            <Lock size={13} className="text-steel shrink-0" />
-            <span className="text-steel">
-              Only counts are shared for other companies — individual member details stay private to each seller.
-            </span>
-          </div>
-        )}
         {companies.length === 0 ? (
           <p className="text-steel text-sm py-6 text-center">No companies found.</p>
         ) : (
@@ -88,7 +73,7 @@ export default function LoginStats() {
                 {companies.map((c) => (
                   <tr
                     key={c.company_slug}
-                    onClick={() => handleRowClick(c.company_slug)}
+                    onClick={() => openCompanyDetails(c)}
                     className={`border-b border-ink/5 last:border-0 cursor-pointer hover:bg-ink/5 transition-colors ${
                       c.company_slug === company.slug ? "bg-turmeric/10" : ""
                     }`}
@@ -123,7 +108,7 @@ export default function LoginStats() {
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-ink/10">
               <div>
-                <h3 className="font-semibold">{company.name} — member login details</h3>
+                <h3 className="font-semibold">{detailCompany?.name || company.name} — member login details</h3>
                 <p className="text-xs text-steel">Last login, today's logins, and all-time logins per member.</p>
               </div>
               <button onClick={() => setDetailOpen(false)} className="p-1.5 rounded-lg hover:bg-ink/5">
