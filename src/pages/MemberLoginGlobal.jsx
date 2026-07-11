@@ -39,6 +39,13 @@ export default function MemberLoginGlobal() {
       `canteen_member_token_${session.company_slug}_info`,
       JSON.stringify({ memberId: session.member_id, memberNumber: session.member_number, name: session.member_name })
     );
+    // Full Access members also get a real seller session — drop them
+    // straight into the same dashboard the seller uses, with everything.
+    if (session.role === "fullaccess" && session.admin_token) {
+      localStorage.setItem(`canteen_admin_token_${session.company_slug}`, session.admin_token);
+      navigate(`/${session.company_slug}/admin`);
+      return;
+    }
     navigate(`/${session.company_slug}/member`);
   };
 

@@ -2503,3 +2503,206 @@ as $$
   where m.company_id = _admin_company(p_token)
   order by m.member_number;
 $$;
+
+-- =========================================================================
+-- v11 — fullaccess role, HR full roster + khata/active management,
+-- khata day/month-end digest for the seller. Idempotent, safe to re-run.
+-- Run this AFTER schema.sql (it re-defines a few existing functions).
+-- =========================================================================
+
+-- ---------------------------------------------------------------------
+-- 1) New role: 'fullaccess'. Logs in exactly like any member (email +
+--    password) but also gets a real admin_sessions token behind the
+--    scenes, so the client can drop them straight into the existing
+--    seller dashboard (AdminDashboard) in addition to their member view.
+--    No admin_* RPC needed to change — they get a genuine admin token.
+-- ---------------------------------------------------------------------
+alter table members drop constraint if exists members_role_check;
+alter table members add constraint members_role_check check (role in ('member', 'hr', 'fullaccess'));
+
+-- admin_upsert_member: seller can now set role = 'fullaccess' too.
+create or replace function admin_upsert_member(
+  p_token uuid, p_id uuid, p_member_number int, p_name text,
+  p_email text, p_password text, p_daily_amount numeric, p_active boolean,
+  p_role text default null, p_khata_eligible boolean default null
+) returns members
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member members%rowtype;
+  v_email text := lower(trim(p_email));
+  v_role text := nullif(lower(trim(p_role)), '');
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if v_role is not null and v_role not in ('member', 'hr', 'fullaccess') then
+    raise exception 'Role must be member, hr or fullaccess';
+  end if;
+
+  if p_id is null then
+    if v_email is null or v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'A valid email is required — it is the member''s login and where the morning mail goes';
+    end if;
+    insert into members(company_id, member_number, name, username, password_hash, daily_amount, active, email, role, khata_eligible)
+    values (
+      v_company_id, p_member_number, p_name, v_email,
+      crypt(coalesce(p_password, substr(gen_random_uuid()::text, 1, 8)), gen_salt('bf')),
+      coalesce(p_daily_amount, 250), coalesce(p_active, true), v_email,
+      coalesce(v_role, 'member'), coalesce(p_khata_eligible, false)
+    )
+    returning * into v_member;
+  else
+    if v_email is not null and v_email <> '' and v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'That does not look like a valid email address';
+    end if;
+    update members set
+      member_number = p_member_number,
+      name = p_name,
+      username = coalesce(nullif(v_email, ''), username),
+      email = coalesce(nullif(v_email, ''), email),
+      password_hash = case when p_password is not null and p_password <> '' then crypt(p_password, gen_salt('bf')) else password_hash end,
+      daily_amount = coalesce(p_daily_amount, daily_amount),
+      active = coalesce(p_active, active),
+      role = coalesce(v_role, role),
+      khata_eligible = coalesce(p_khata_eligible, khata_eligible)
+    where id = p_id and company_id = v_company_id
+    returning * into v_member;
+  end if;
+  return v_member;
+end;
+$$;
+
+-- member_login_v2 now also mints a real admin_sessions token when the
+-- member's role is 'fullaccess', and returns their role. Return type
+-- changed, so drop first (same reason as every other v-bump in schema.sql).
+drop function if exists member_login_v2(text, text);
+create or replace function member_login_v2(p_email text, p_password text)
+returns table(token uuid, member_id uuid, member_number int, member_name text,
+              company_slug text, company_name text, role text, admin_token uuid)
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype;
+  v_company companies%rowtype;
+  v_token uuid;
+  v_admin_token uuid;
+begin
+  for v_member in
+    select m.* from members m
+    where (lower(m.username) = lower(trim(p_email)) or lower(m.email) = lower(trim(p_email)))
+      and m.active
+    order by m.created_at desc
+  loop
+    if v_member.password_hash = crypt(p_password, v_member.password_hash) then
+      select * into v_company from companies where id = v_member.company_id;
+
+      if v_member.email is null and v_member.username ~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+        update members set email = lower(trim(v_member.username)) where id = v_member.id;
+      end if;
+
+      insert into member_sessions(member_id) values (v_member.id) returning member_sessions.token into v_token;
+      insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+
+      v_admin_token := null;
+      if v_member.role = 'fullaccess' then
+        insert into admin_sessions(company_id) values (v_company.id) returning admin_sessions.token into v_admin_token;
+        insert into login_events(company_id, kind) values (v_company.id, 'seller');
+      end if;
+
+      return query select v_token, v_member.id, v_member.member_number, v_member.name,
+                          v_company.slug, v_company.name, v_member.role, v_admin_token;
+      return;
+    end if;
+  end loop;
+  return; -- no match → empty result → "wrong email or password"
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 2) HR: see the FULL roster (member + hr, not just plain members), with
+--    role + khata_eligible visible, so HR can spot who's who and manage
+--    khata / offboarding. Still can never see fullaccess or the seller.
+-- ---------------------------------------------------------------------
+drop function if exists hr_list_members(uuid);
+create or replace function hr_list_members(p_token uuid)
+returns table(id uuid, member_number int, name text, email text, active boolean,
+              daily_amount numeric, khata_eligible boolean, role text, last_login timestamptz)
+language sql
+security definer
+as $$
+  select m.id, m.member_number, m.name, m.email, m.active, m.daily_amount, m.khata_eligible, m.role,
+         (select max(le.created_at) from login_events le where le.member_id = m.id and le.kind = 'member')
+  from members m
+  where m.company_id = _hr_company(p_token) and m.role in ('member', 'hr')
+  order by m.member_number;
+$$;
+
+-- HR: toggle khata eligibility. Scoped to role='member' targets only —
+-- same guardrail as hr_reset_member_password (can't touch other HR/seller).
+create or replace function hr_set_khata_eligible(p_token uuid, p_member_id uuid, p_khata_eligible boolean)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _hr_company(p_token);
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  update members set khata_eligible = p_khata_eligible
+  where id = p_member_id and company_id = v_company_id and role = 'member';
+  if not found then raise exception 'Member not found'; end if;
+end;
+$$;
+
+-- HR: deactivate/reactivate a member who left/rejoined the company.
+-- Soft delete (active=false) — keeps attendance/khata history intact,
+-- and it's reversible if it turns out to be a mistake.
+create or replace function hr_set_member_active(p_token uuid, p_member_id uuid, p_active boolean)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _hr_company(p_token);
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  update members set active = p_active
+  where id = p_member_id and company_id = v_company_id and role = 'member';
+  if not found then raise exception 'Member not found'; end if;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 3) Khata digest: rows for the day-end / month-end email to the seller.
+--    SERVICE-ROLE ONLY — called from a scheduled Edge Function, same
+--    pattern as create_daily_checkins / generate_password_otp.
+-- ---------------------------------------------------------------------
+create or replace function khata_digest_rows(p_period text default 'day')
+returns table(
+  company_id uuid, company_name text, seller_email text,
+  member_name text, member_number int, product_name text,
+  price numeric, qty int, line_total numeric, created_at timestamptz
+)
+language sql
+security definer
+as $$
+  select k.company_id, c.name, c.seller_username,
+         coalesce(m.name, 'Member #' || m.member_number), m.member_number,
+         k.product_name, k.price, k.qty, k.price * k.qty, k.created_at
+  from khata_entries k
+  join companies c on c.id = k.company_id
+  join members m on m.id = k.member_id
+  where k.status = 'due'
+    and c.seller_username is not null
+    and (
+      (p_period = 'day' and k.created_at::date = current_date)
+      or (p_period = 'month' and date_trunc('month', k.created_at) = date_trunc('month', now()))
+    )
+  order by k.company_id, m.member_number, k.created_at;
+$$;
+
+revoke execute on function khata_digest_rows(text) from public, anon, authenticated;
+grant execute on function khata_digest_rows(text) to service_role;

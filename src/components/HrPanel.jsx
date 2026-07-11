@@ -1,19 +1,21 @@
 import React, { useEffect, useState } from "react";
-import { Users, LogIn, CalendarDays, Sigma, KeyRound, X, Loader2, ShieldCheck } from "lucide-react";
+import { Users, LogIn, CalendarDays, Sigma, KeyRound, X, Loader2, ShieldCheck, UserX, UserCheck, BookText } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import StatCard from "./StatCard";
 import PasswordInput from "./PasswordInput";
 
 // Dashboard-lite for HR: read-only attendance/login analytics (same numbers
-// the seller sees), a roster of regular members with last-login, and the
-// ability to reset a regular member's password. HR cannot see or touch
-// other HR accounts, the seller account, or anything admin_* controls.
+// the seller sees), the full member+HR roster with last-login, khata
+// eligibility toggle, offboarding (deactivate/reactivate), and password
+// resets — all scoped to plain 'member' targets only. HR cannot see or
+// touch the seller account or anything admin_* controls beyond this.
 export default function HrPanel() {
-  const { hrListMembers, hrLoginStats } = useStore();
+  const { hrListMembers, hrLoginStats, hrSetKhataEligible, hrSetMemberActive } = useStore();
   const [members, setMembers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resetTarget, setResetTarget] = useState(null); // null | member
+  const [busyId, setBusyId] = useState(null);
 
   const refresh = async () => {
     setLoading(true);
@@ -21,6 +23,24 @@ export default function HrPanel() {
     setMembers(m);
     setStats(s);
     setLoading(false);
+  };
+
+  const toggleKhata = async (m) => {
+    setBusyId(m.id);
+    const res = await hrSetKhataEligible(m.id, !m.khata_eligible);
+    setBusyId(null);
+    if (!res.ok) return alert(res.error || "Couldn't update khata access.");
+    refresh();
+  };
+
+  const toggleActive = async (m) => {
+    const verb = m.active ? "Remove" : "Reactivate";
+    if (!confirm(`${verb} #${m.member_number} · ${m.name || m.email}?`)) return;
+    setBusyId(m.id);
+    const res = await hrSetMemberActive(m.id, !m.active);
+    setBusyId(null);
+    if (!res.ok) return alert(res.error || "Couldn't update this member.");
+    refresh();
   };
 
   useEffect(() => {
@@ -45,8 +65,8 @@ export default function HrPanel() {
         <span className="text-[10px] font-mono uppercase bg-sage/15 text-sage px-2 py-0.5 rounded-full">HR access</span>
       </div>
       <p className="text-steel text-xs mb-4">
-        Attendance/login analytics, plus password resets for regular members. You can't manage other HR
-        accounts or the seller login.
+        Attendance/login analytics, khata access, offboarding, and password resets for regular members.
+        You can see other HR accounts but can't manage them, or the seller login.
       </p>
 
       {loading ? (
@@ -69,27 +89,68 @@ export default function HrPanel() {
                   <tr className="text-left text-[11px] font-mono uppercase text-steel border-b border-ink/10">
                     <th className="py-2 px-1">Member</th>
                     <th className="py-2 px-1">Last login</th>
-                    <th className="py-2 px-1 text-right">Reset password</th>
+                    <th className="py-2 px-1">Khata</th>
+                    <th className="py-2 px-1 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {members.map((m) => (
-                    <tr key={m.id} className="border-b border-ink/5 last:border-0">
-                      <td className="py-2 px-1">
-                        <p className="font-medium">#{m.member_number} · {m.name || "(no name)"}</p>
-                        <p className="text-xs text-steel font-mono">{m.email}</p>
-                      </td>
-                      <td className="py-2 px-1 text-steel font-mono text-xs">{formatLastLogin(m.last_login)}</td>
-                      <td className="py-2 px-1 text-right">
-                        <button
-                          onClick={() => setResetTarget(m)}
-                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-sage hover:text-sage/80 px-2 py-1"
-                        >
-                          <KeyRound size={13} /> Reset
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {members.map((m) => {
+                    const managed = m.role === "member"; // HR can only act on plain members
+                    return (
+                      <tr key={m.id} className={`border-b border-ink/5 last:border-0 ${!m.active ? "opacity-50" : ""}`}>
+                        <td className="py-2 px-1">
+                          <p className="font-medium flex items-center gap-1.5">
+                            #{m.member_number} · {m.name || "(no name)"}
+                            {m.role === "hr" && (
+                              <span className="text-[10px] font-mono uppercase bg-sage/15 text-sage px-1.5 py-0.5 rounded-full">HR</span>
+                            )}
+                            {!m.active && (
+                              <span className="text-[10px] font-mono uppercase bg-brick/10 text-brick px-1.5 py-0.5 rounded-full">Removed</span>
+                            )}
+                          </p>
+                          <p className="text-xs text-steel font-mono">{m.email}</p>
+                        </td>
+                        <td className="py-2 px-1 text-steel font-mono text-xs">{formatLastLogin(m.last_login)}</td>
+                        <td className="py-2 px-1">
+                          {managed ? (
+                            <button
+                              onClick={() => toggleKhata(m)}
+                              disabled={busyId === m.id}
+                              className={`inline-flex items-center gap-1 text-[11px] font-mono uppercase px-2 py-0.5 rounded-full disabled:opacity-50 ${
+                                m.khata_eligible ? "bg-turmeric/20 text-turmeric-dark" : "bg-ink/5 text-steel"
+                              }`}
+                            >
+                              <BookText size={11} /> {m.khata_eligible ? "On" : "Off"}
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-steel">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-1 text-right whitespace-nowrap">
+                          {managed && (
+                            <>
+                              <button
+                                onClick={() => setResetTarget(m)}
+                                className="inline-flex items-center gap-1.5 text-xs font-semibold text-sage hover:text-sage/80 px-2 py-1"
+                              >
+                                <KeyRound size={13} /> Reset
+                              </button>
+                              <button
+                                onClick={() => toggleActive(m)}
+                                disabled={busyId === m.id}
+                                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2 py-1 disabled:opacity-50 ${
+                                  m.active ? "text-brick hover:text-brick/80" : "text-sage hover:text-sage/80"
+                                }`}
+                              >
+                                {m.active ? <UserX size={13} /> : <UserCheck size={13} />}
+                                {m.active ? "Remove" : "Reactivate"}
+                              </button>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

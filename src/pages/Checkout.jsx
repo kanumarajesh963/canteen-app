@@ -83,7 +83,9 @@ export default function Checkout() {
       </div>
 
       <div className="space-y-2.5">
-        {paymentApps.map((app) => (
+        {paymentApps
+          .filter((app) => app.id !== "khata" || (isMember && memberProfile?.khata_eligible))
+          .map((app) => (
           <button
             key={app.id}
             onClick={() => setMethod(app.id)}
@@ -100,13 +102,7 @@ export default function Checkout() {
               {app.id === "wallet" && !customerId && (
                 <span className="block text-xs font-mono text-steel">Log in to use your wallet</span>
               )}
-              {app.id === "khata" && !isMember && (
-                <span className="block text-xs font-mono text-steel">Log in to your member account to use Khata</span>
-              )}
-              {app.id === "khata" && isMember && !memberProfile?.khata_eligible && (
-                <span className="block text-xs font-mono text-steel">Not enabled for your account — ask your seller</span>
-              )}
-              {app.id === "khata" && isMember && memberProfile?.khata_eligible && (
+              {app.id === "khata" && (
                 <span className="block text-xs font-mono text-steel">Adds to your credit tab, settle later</span>
               )}
             </span>

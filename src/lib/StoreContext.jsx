@@ -658,6 +658,32 @@ export function StoreProvider({ companySlug, children }) {
     return data?.[0] || null;
   }, [memberToken]);
 
+  const hrSetKhataEligible = useCallback(
+    async (memberId, khataEligible) => {
+      const { error } = await supabase.rpc("hr_set_khata_eligible", {
+        p_token: memberToken,
+        p_member_id: memberId,
+        p_khata_eligible: khataEligible,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
+  const hrSetMemberActive = useCallback(
+    async (memberId, active) => {
+      const { error } = await supabase.rpc("hr_set_member_active", {
+        p_token: memberToken,
+        p_member_id: memberId,
+        p_active: active,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
   // ---------- seller: khata (credit tab) ----------
   const khataSummary = useCallback(async () => {
     if (!adminToken) return [];
@@ -820,6 +846,8 @@ export function StoreProvider({ companySlug, children }) {
       hrResetMemberPassword,
       hrAttendance,
       hrLoginStats,
+      hrSetKhataEligible,
+      hrSetMemberActive,
     }),
     [
       loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
@@ -832,6 +860,7 @@ export function StoreProvider({ companySlug, children }) {
       listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
       loginStats, allCompanyLoginCounts, memberLoginDetails, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
       memberProfile, placeOrderKhata, hrListMembers, hrResetMemberPassword, hrAttendance, hrLoginStats,
+      hrSetKhataEligible, hrSetMemberActive,
     ]
   );
 

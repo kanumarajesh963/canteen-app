@@ -50,6 +50,9 @@ export default function MembersManager() {
                     {m.role === "hr" && (
                       <span className="text-[10px] font-mono uppercase bg-sage/15 text-sage px-1.5 py-0.5 rounded-full">HR</span>
                     )}
+                    {m.role === "fullaccess" && (
+                      <span className="text-[10px] font-mono uppercase bg-turmeric/20 text-turmeric-dark px-1.5 py-0.5 rounded-full">Full Access</span>
+                    )}
                   </p>
                   <p className="text-xs text-steel font-mono truncate max-w-[170px]">{m.email || m.username}</p>
                 </div>
@@ -192,6 +195,7 @@ function MemberModal({ initial, onClose, onSave }) {
             >
               <option value="member">Member</option>
               <option value="hr">HR — attendance/analytics view + password resets</option>
+              <option value="fullaccess">Full Access — sees everything you see</option>
             </select>
           </div>
           <label className="flex items-center gap-2 text-sm">
