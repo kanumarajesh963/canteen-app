@@ -452,6 +452,12 @@ export function StoreProvider({ companySlug, children }) {
     [memberToken]
   );
 
+  const listMyTickets = useCallback(async () => {
+    if (!memberToken) return [];
+    const { data } = await supabase.rpc("member_list_tickets", { p_token: memberToken });
+    return data || [];
+  }, [memberToken]);
+
   // ---------- seller: tickets + login stats ----------
   const listTickets = useCallback(async () => {
     if (!adminToken) return [];
@@ -465,6 +471,34 @@ export function StoreProvider({ companySlug, children }) {
     },
     [adminToken]
   );
+
+  const replyTicket = useCallback(
+    async (id, reply) => {
+      const { error } = await supabase.rpc("admin_reply_ticket", { p_token: adminToken, p_id: id, p_reply: reply });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [adminToken]
+  );
+
+  // ---------- password reset via emailed OTP (no login required) ----------
+  const requestPasswordOtp = useCallback(async (email) => {
+    if (!supabaseConfigured) return { ok: false, error: "Backend not connected yet." };
+    const { data, error } = await supabase.functions.invoke("send-password-otp", { body: { email } });
+    if (error) return { ok: false, error: error.message || "Couldn't send the code. Try again." };
+    if (data?.error) return { ok: false, error: data.error };
+    return { ok: true };
+  }, []);
+
+  const resetPasswordWithOtp = useCallback(async (email, otp, newPassword) => {
+    const { error } = await supabase.rpc("verify_and_reset_password", {
+      p_email: email,
+      p_otp: otp,
+      p_new_password: newPassword,
+    });
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  }, []);
 
   const loginStats = useCallback(async () => {
     if (!adminToken) return null;
@@ -595,8 +629,12 @@ export function StoreProvider({ companySlug, children }) {
       checkinStatusToday,
       checkinToday,
       raiseMyTicket,
+      listMyTickets,
       listTickets,
       setTicketStatus,
+      replyTicket,
+      requestPasswordOtp,
+      resetPasswordWithOtp,
       loginStats,
       allCompanyLoginCounts,
       listMembers,
@@ -615,7 +653,8 @@ export function StoreProvider({ companySlug, children }) {
       setOrderStatus, isMember, memberInfo, loginMemberWithSession, logoutMember, myAttendance, listMembers,
       upsertMember, deleteMember, markAttendance, unmarkAttendance, attendanceForDate, getAttendanceRecords,
       myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
-      listTickets, setTicketStatus, loginStats, allCompanyLoginCounts,
+      listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
+      loginStats, allCompanyLoginCounts,
     ]
   );
 

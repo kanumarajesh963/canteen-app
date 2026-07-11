@@ -256,3 +256,44 @@ curl -X POST "https://YOUR-PROJECT-REF.supabase.co/functions/v1/daily-checkin-em
 ```
 
 Trigger it from anywhere: a cron on your machine, the Supabase dashboard's **Invoke** button, Postman, or the pg_cron schedule from the section above if you later want it automatic. Each mail's ✅ **Yes** button charges that member their ₹250 for today; ❌ **No** charges nothing.
+
+---
+
+# v6 + v7 additions (this build)
+
+On top of everything above, this build adds three things that were only half-wired in before: **ticket email alerts**, a **real OTP password reset**, and a **working seller self-signup** page (the `Sellersignup.jsx` page already existed but the backend functions and `globalAuth.js` exports it needed didn't — the build was broken until this update).
+
+## 1. Email support@canteen.com whenever a ticket is raised
+
+Every new row in `tickets` (a member's "Raise a ticket", a password-reset request, or the anonymous forgot-password flow) now fires a Postgres trigger that emails your support inbox with the ticket ID, who raised it, and what it's about.
+
+**Setup (~5 minutes):**
+1. Run the updated `supabase/schema.sql` (whole file — it's idempotent).
+2. Deploy the new Edge Function: **Edge Functions → Deploy**, name it `notify-new-ticket`, paste [`supabase/functions/notify-new-ticket/index.ts`](./supabase/functions/notify-new-ticket/index.ts).
+3. In that function's **Secrets**, set `RESEND_API_KEY`, `FROM_EMAIL` (same values as `daily-checkin-email`), and optionally `SUPPORT_EMAIL` (defaults to `support@canteen.com`).
+4. In the SQL Editor, point the trigger at your function and key:
+   ```sql
+   update app_config set value = 'https://YOUR-PROJECT-REF.supabase.co/functions/v1' where key = 'edge_function_url';
+   update app_config set value = 'YOUR-SERVICE-ROLE-KEY' where key = 'service_role_key';
+   ```
+   (Project Settings → API → service_role.) Until you set these, ticket creation still works fine — the trigger just skips the email silently.
+
+## 2. Password reset with an emailed OTP (no more waiting on the seller)
+
+`/member/forgot` now: enter your email → get a 6-digit code → enter the code + a new password → done, immediately. The old flow (raise a ticket, seller resets it manually) still exists as a fallback at `/member/forgot/ask-seller` for members who can't access their inbox.
+
+**Setup:** deploy `supabase/functions/send-password-otp/index.ts` as an Edge Function named `send-password-otp`, with the same `RESEND_API_KEY` / `FROM_EMAIL` secrets, deployed with `--no-verify-jwt` (no one is logged in yet at this point). That's it — the RPCs are already in `schema.sql`.
+
+## 3. Seller signup — "Create your company" (`/seller/signup`)
+
+A seller can now create their own company (name + email + password) without you running a manual SQL insert. On success they get a short **company code** and land straight in their dashboard. OTP email verification before account creation is supported but **off by default**; turn it on with:
+```sql
+update app_config set value = 'true' where key = 'seller_signup_otp_required';
+```
+If you turn it on, also deploy `supabase/functions/send-seller-signup-otp/index.ts` as `send-seller-signup-otp` (`--no-verify-jwt`, same Resend secrets).
+
+## Honest limitations of this add-on
+
+- OTP codes are 6 digits, expire in 10 minutes, and are single-use — reasonable for an internal tool, but there's no rate-limiting on how often a code can be requested. Add that at the Edge Function or API-gateway level before opening this up beyond a trusted office.
+- The `notify-new-ticket` trigger reads its target URL and key from a plain `app_config` table (no encryption) rather than Supabase Vault, matching the existing cron-setup pattern in this repo. Fine for an internal deployment; tighten it (e.g. Vault secrets) if this ever handles sensitive tickets.
+- `seller_signup` lets anyone with an email create a company — there's no admin approval step. If you don't want that, leave it undocumented/unlinked, or add an approval flag before rollout.

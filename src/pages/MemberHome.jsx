@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import {
-  CalendarCheck, LogOut, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2,
+  CalendarCheck, LogOut, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply,
 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import StatCard from "../components/StatCard";
@@ -10,7 +10,7 @@ import PasswordInput from "../components/PasswordInput";
 export default function MemberHome() {
   const {
     isMember, memberInfo, logoutMember, myAttendance, company,
-    myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
+    myProfile, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket, listMyTickets,
   } = useStore();
 
   const [records, setRecords] = useState([]);
@@ -20,12 +20,14 @@ export default function MemberHome() {
   const [checkinBusy, setCheckinBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showTicket, setShowTicket] = useState(false);
+  const [myTickets, setMyTickets] = useState([]);
 
   const refreshAll = async () => {
-    const [r, p, c] = await Promise.all([myAttendance(), myProfile(), checkinStatusToday()]);
+    const [r, p, c, t] = await Promise.all([myAttendance(), myProfile(), checkinStatusToday(), listMyTickets()]);
     setRecords(r);
     setProfile(p);
     setCheckin(c);
+    setMyTickets(t);
     setLoading(false);
   };
 
@@ -173,8 +175,43 @@ export default function MemberHome() {
         )}
       </div>
 
+      {myTickets.length > 0 && (
+        <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 mt-6">
+          <p className="text-sm font-semibold mb-3">My tickets</p>
+          <div className="space-y-3">
+            {myTickets.map((t) => (
+              <div key={t.id} className="border border-ink/10 rounded-xl p-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-semibold text-sm">{t.subject}</p>
+                  <span
+                    className={`text-[10px] font-mono uppercase px-2 py-0.5 rounded-full ${
+                      t.status === "open" ? "bg-brick/10 text-brick" : "bg-sage/15 text-sage"
+                    }`}
+                  >
+                    {t.status}
+                  </span>
+                </div>
+                {t.message && <p className="text-sm text-steel mt-1 whitespace-pre-wrap">{t.message}</p>}
+                {t.reply && (
+                  <div className="mt-2 bg-paper2 rounded-lg p-2.5 flex gap-2">
+                    <MessageSquareReply size={14} className="text-turmeric-dark shrink-0 mt-0.5" />
+                    <p className="text-sm whitespace-pre-wrap">{t.reply}</p>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {showPassword && <ChangePasswordModal onClose={() => setShowPassword(false)} changeMyPassword={changeMyPassword} />}
-      {showTicket && <RaiseTicketModal onClose={() => setShowTicket(false)} raiseMyTicket={raiseMyTicket} />}
+      {showTicket && (
+        <RaiseTicketModal
+          onClose={() => setShowTicket(false)}
+          raiseMyTicket={raiseMyTicket}
+          onSent={refreshAll}
+        />
+      )}
     </div>
   );
 }
@@ -252,7 +289,7 @@ function ChangePasswordModal({ onClose, changeMyPassword }) {
   );
 }
 
-function RaiseTicketModal({ onClose, raiseMyTicket }) {
+function RaiseTicketModal({ onClose, raiseMyTicket, onSent }) {
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -270,6 +307,7 @@ function RaiseTicketModal({ onClose, raiseMyTicket }) {
       return;
     }
     setDone(true);
+    onSent?.();
   };
 
   return (

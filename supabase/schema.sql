@@ -1420,3 +1420,375 @@ begin
   return true;
 end;
 $$;
+
+-- =========================================================================
+-- v6 add-on: OTP-verified password reset, ticket email notifications,
+--            admin replies to tickets, member's own ticket list.
+-- =========================================================================
+-- Safe to re-run — everything below is idempotent. Run the WHOLE file again
+-- and only this new section changes anything.
+-- =========================================================================
+
+-- 1) Tickets can now carry a reply from the seller.
+alter table tickets add column if not exists reply text;
+alter table tickets add column if not exists replied_at timestamptz;
+
+-- 2) Small key/value config table so the notify-new-ticket trigger below can
+--    find your Edge Function URL + service role key without editing SQL.
+--    Fill these in AFTER you deploy the notify-new-ticket function (README).
+create table if not exists app_config (
+  key   text primary key,
+  value text not null
+);
+insert into app_config (key, value) values
+  ('edge_function_url', 'https://YOUR-PROJECT-REF.supabase.co/functions/v1'),
+  ('service_role_key',  'YOUR-SERVICE-ROLE-KEY'),
+  ('support_email',     'support@canteen.com')
+on conflict (key) do nothing;
+alter table app_config enable row level security;
+-- no policies: nothing in the browser (anon key) can read or write this.
+
+-- 3) One-time passwords for password reset. A code is only ever valid for
+--    10 minutes and can only be used once.
+create table if not exists password_reset_otps (
+  id          uuid primary key default gen_random_uuid(),
+  email       text not null,
+  otp_code    text not null,
+  expires_at  timestamptz not null,
+  used        boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_password_reset_otps_email on password_reset_otps(email, used, expires_at);
+alter table password_reset_otps enable row level security;
+-- no policies: RPC-only access, and generate_password_otp is service_role-only.
+
+-- ---------------------------------------------------------------------
+-- Notify support@canteen.com by email whenever a new ticket is raised.
+-- Fires on every insert into tickets; calls the notify-new-ticket Edge
+-- Function via pg_net using the URL/key stored in app_config above. If
+-- those are still the placeholder values, it quietly does nothing instead
+-- of erroring — so this is safe to run before you've deployed the function.
+-- ---------------------------------------------------------------------
+create or replace function notify_new_ticket()
+returns trigger
+language plpgsql
+security definer
+as $$
+declare
+  v_url text;
+  v_key text;
+  v_company companies%rowtype;
+begin
+  select value into v_url from app_config where key = 'edge_function_url';
+  select value into v_key from app_config where key = 'service_role_key';
+
+  if v_url is null or v_key is null
+     or v_url = 'https://YOUR-PROJECT-REF.supabase.co/functions/v1'
+     or v_key = 'YOUR-SERVICE-ROLE-KEY' then
+    return new; -- not configured yet — skip silently, don't block the insert
+  end if;
+
+  select * into v_company from companies where id = new.company_id;
+
+  perform net.http_post(
+    url := v_url || '/notify-new-ticket',
+    headers := jsonb_build_object(
+      'Content-Type', 'application/json',
+      'Authorization', 'Bearer ' || v_key
+    ),
+    body := jsonb_build_object(
+      'ticket_id', new.id,
+      'company_name', coalesce(v_company.name, 'Unknown company'),
+      'type', new.type,
+      'subject', new.subject,
+      'message', new.message,
+      'name', coalesce(new.name, 'Anonymous'),
+      'contact', new.contact
+    )
+  );
+  return new;
+exception when others then
+  -- Never let a notification failure block the ticket from being created.
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_notify_new_ticket on tickets;
+create trigger trg_notify_new_ticket
+  after insert on tickets
+  for each row execute function notify_new_ticket();
+
+-- ---------------------------------------------------------------------
+-- Admin (seller) replies to a ticket. Sets the reply and marks resolved.
+-- ---------------------------------------------------------------------
+create or replace function admin_reply_ticket(p_token uuid, p_id uuid, p_reply text)
+returns tickets
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _admin_company(p_token);
+  v_ticket tickets%rowtype;
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if coalesce(trim(p_reply), '') = '' then raise exception 'Reply cannot be empty'; end if;
+
+  update tickets
+  set reply = p_reply, replied_at = now(), status = 'resolved'
+  where id = p_id and company_id = v_company_id
+  returning * into v_ticket;
+
+  if v_ticket.id is null then raise exception 'Ticket not found'; end if;
+  return v_ticket;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- A logged-in member's own tickets (so they can see the seller's reply).
+-- ---------------------------------------------------------------------
+create or replace function member_list_tickets(p_token uuid)
+returns setof tickets
+language sql
+security definer
+as $$
+  select t.* from tickets t
+  join member_sessions s on s.member_id = t.member_id
+  where s.token = p_token and t.member_id is not null
+  order by t.created_at desc;
+$$;
+
+-- ---------------------------------------------------------------------
+-- OTP-verified password reset.
+-- ---------------------------------------------------------------------
+-- Step 1: generate a 6-digit code for an email, valid 10 minutes.
+-- SERVICE-ROLE ONLY: the frontend never calls this directly — it goes
+-- through the send-password-otp Edge Function, which is the only thing
+-- that actually emails the code out. That's what keeps this from being a
+-- way to read someone else's OTP straight from the browser.
+create or replace function generate_password_otp(p_email text)
+returns table(otp_code text, member_name text, company_name text, found boolean)
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype;
+  v_company companies%rowtype;
+  v_code text;
+begin
+  select m.* into v_member from members m
+  where (lower(m.username) = lower(trim(p_email)) or lower(m.email) = lower(trim(p_email)))
+    and m.active
+  order by m.created_at desc
+  limit 1;
+
+  if v_member.id is null then
+    return query select null::text, null::text, null::text, false;
+    return;
+  end if;
+
+  select * into v_company from companies where id = v_member.company_id;
+  v_code := lpad(floor(random() * 1000000)::text, 6, '0');
+
+  insert into password_reset_otps(email, otp_code, expires_at)
+  values (lower(trim(p_email)), v_code, now() + interval '10 minutes');
+
+  return query select v_code, coalesce(v_member.name, 'Member #' || v_member.member_number), v_company.name, true;
+end;
+$$;
+
+revoke execute on function generate_password_otp(text) from public, anon, authenticated;
+grant execute on function generate_password_otp(text) to service_role;
+
+-- Step 2: verify the code and set a new password. Callable from the browser.
+create or replace function verify_and_reset_password(p_email text, p_otp text, p_new_password text)
+returns boolean
+language plpgsql
+security definer
+as $$
+declare
+  v_otp password_reset_otps%rowtype;
+  v_member members%rowtype;
+begin
+  if coalesce(length(p_new_password), 0) < 6 then
+    raise exception 'New password must be at least 6 characters';
+  end if;
+
+  select * into v_otp from password_reset_otps
+  where lower(email) = lower(trim(p_email))
+    and otp_code = trim(p_otp)
+    and not used
+    and expires_at > now()
+  order by created_at desc
+  limit 1;
+
+  if v_otp.id is null then
+    raise exception 'That code is invalid or has expired — request a new one';
+  end if;
+
+  select * into v_member from members m
+  where (lower(m.username) = lower(trim(p_email)) or lower(m.email) = lower(trim(p_email)))
+    and m.active
+  order by m.created_at desc
+  limit 1;
+
+  if v_member.id is null then
+    raise exception 'Account not found';
+  end if;
+
+  update members set password_hash = crypt(p_new_password, gen_salt('bf')) where id = v_member.id;
+  update password_reset_otps set used = true where id = v_otp.id;
+  -- burn any other outstanding codes for this email too
+  update password_reset_otps set used = true
+  where lower(email) = lower(trim(p_email)) and not used;
+
+  return true;
+end;
+$$;
+
+-- =========================================================================
+-- v7 add-on: seller self-signup (create your own company), with an
+--            optional OTP-verification step before the company is created.
+-- =========================================================================
+-- Safe to re-run. This is what src/pages/Sellersignup.jsx talks to.
+-- =========================================================================
+
+alter table companies add column if not exists company_code text unique;
+
+-- Toggle whether signup requires an emailed OTP before creating the company.
+-- Off by default — flip to 'true' any time in the SQL editor:
+--   update app_config set value = 'true' where key = 'seller_signup_otp_required';
+insert into app_config (key, value) values ('seller_signup_otp_required', 'false')
+on conflict (key) do nothing;
+
+-- Publicly readable — the signup page checks this before deciding whether
+-- to show the OTP step. Contains no secrets.
+create or replace function get_signup_settings()
+returns table(otp_required boolean)
+language sql
+security definer
+as $$
+  select coalesce((select value from app_config where key = 'seller_signup_otp_required'), 'false') = 'true';
+$$;
+
+create table if not exists signup_otps (
+  id          uuid primary key default gen_random_uuid(),
+  email       text not null,
+  otp_code    text not null,
+  expires_at  timestamptz not null,
+  used        boolean not null default false,
+  created_at  timestamptz not null default now()
+);
+create index if not exists idx_signup_otps_email on signup_otps(email, used, expires_at);
+alter table signup_otps enable row level security;
+-- no policies: RPC-only, and generate_signup_otp is service_role-only.
+
+-- SERVICE-ROLE ONLY — called by the send-seller-signup-otp Edge Function,
+-- which is the only thing that actually emails the code out.
+create or replace function generate_signup_otp(p_email text)
+returns text
+language plpgsql
+security definer
+as $$
+declare
+  v_code text := lpad(floor(random() * 1000000)::text, 6, '0');
+begin
+  insert into signup_otps(email, otp_code, expires_at)
+  values (lower(trim(p_email)), v_code, now() + interval '10 minutes');
+  return v_code;
+end;
+$$;
+
+revoke execute on function generate_signup_otp(text) from public, anon, authenticated;
+grant execute on function generate_signup_otp(text) to service_role;
+
+-- Turn "Acme Corp Canteen" into a unique, URL-safe slug like "acme-corp-canteen",
+-- "acme-corp-canteen-2" if that's taken, etc.
+create or replace function _slugify_company_name(p_name text)
+returns text
+language plpgsql
+as $$
+declare
+  v_base text;
+  v_slug text;
+  v_n int := 1;
+begin
+  v_base := lower(regexp_replace(trim(p_name), '[^a-zA-Z0-9]+', '-', 'g'));
+  v_base := trim(both '-' from v_base);
+  if v_base = '' then v_base := 'canteen'; end if;
+  v_slug := v_base;
+  while exists (select 1 from companies where slug = v_slug) loop
+    v_n := v_n + 1;
+    v_slug := v_base || '-' || v_n;
+  end loop;
+  return v_slug;
+end;
+$$;
+
+-- A short, shareable, unique code for the company (shown to the seller after
+-- signup — handy as a human-friendly identifier alongside the URL slug).
+create or replace function _generate_company_code()
+returns text
+language plpgsql
+as $$
+declare
+  v_chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- no 0/O/1/I ambiguity
+  v_code text;
+begin
+  loop
+    v_code := '';
+    for i in 1..6 loop
+      v_code := v_code || substr(v_chars, 1 + floor(random() * length(v_chars))::int, 1);
+    end loop;
+    exit when not exists (select 1 from companies where company_code = v_code);
+  end loop;
+  return v_code;
+end;
+$$;
+
+-- Create a brand-new company + its first seller login, in one step.
+-- If OTP is required (see get_signup_settings), p_otp must match a code
+-- generated for p_email within the last 10 minutes.
+create or replace function seller_signup(p_email text, p_password text, p_company_name text, p_otp text default null)
+returns table(token uuid, company_slug text, company_name text, company_code text)
+language plpgsql
+security definer
+as $$
+declare
+  v_email text := lower(trim(p_email));
+  v_otp_required boolean;
+  v_otp signup_otps%rowtype;
+  v_slug text;
+  v_code text;
+  v_company_id uuid;
+  v_token uuid;
+begin
+  if coalesce(trim(p_company_name), '') = '' then raise exception 'Company name is required'; end if;
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then raise exception 'A valid email is required'; end if;
+  if coalesce(length(p_password), 0) < 6 then raise exception 'Password must be at least 6 characters'; end if;
+  if exists (select 1 from companies where seller_username = v_email) then
+    raise exception 'An account with that email already exists — try logging in instead';
+  end if;
+
+  select otp_required into v_otp_required from get_signup_settings();
+  if v_otp_required then
+    select * into v_otp from signup_otps
+    where lower(email) = v_email and otp_code = trim(coalesce(p_otp, '')) and not used and expires_at > now()
+    order by created_at desc limit 1;
+    if v_otp.id is null then
+      raise exception 'That code is invalid or has expired — request a new one';
+    end if;
+    update signup_otps set used = true where id = v_otp.id;
+  end if;
+
+  v_slug := _slugify_company_name(p_company_name);
+  v_code := _generate_company_code();
+
+  insert into companies (slug, name, admin_password_hash, seller_username, company_code)
+  values (v_slug, trim(p_company_name), crypt(p_password, gen_salt('bf')), v_email, v_code)
+  returning id into v_company_id;
+
+  insert into admin_sessions(company_id) values (v_company_id) returning admin_sessions.token into v_token;
+
+  return query select v_token, v_slug, trim(p_company_name), v_code;
+end;
+$$;
