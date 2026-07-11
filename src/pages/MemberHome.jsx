@@ -6,6 +6,7 @@ import {
 import { useStore } from "../lib/StoreContext";
 import StatCard from "../components/StatCard";
 import PasswordInput from "../components/PasswordInput";
+import HrPanel from "../components/HrPanel";
 
 export default function MemberHome() {
   const {
@@ -70,6 +71,8 @@ export default function MemberHome() {
           {company.name} · Member #{memberInfo?.memberNumber}
         </p>
       </div>
+
+      {profile?.role === "hr" && <HrPanel />}
 
       {/* ---- Today's check-in: same question the morning email asks ---- */}
       <div className="bg-board text-paper rounded-2xl p-5 mb-6">

@@ -2200,3 +2200,261 @@ as $$
   from khata_entries k
   join _member_from_token(p_token) m on m.id = k.member_id;
 $$;
+
+-- =========================================================================
+-- v9 — Company codes up to 10 chars, HR role, member-facing khata checkout.
+-- Idempotent: safe to re-run the whole file against an existing database.
+-- =========================================================================
+
+-- ---------------------------------------------------------------------
+-- 1) Company codes: generate 8 chars now (field/column already support up
+--    to 10 -- no schema change needed there, company_code was always plain
+--    `text unique` with no length constraint). Existing 6-char codes keep
+--    working unchanged.
+-- ---------------------------------------------------------------------
+create or replace function _generate_company_code()
+returns text
+language plpgsql
+as $$
+declare
+  v_chars text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; -- no 0/O/1/I ambiguity
+  v_code text;
+begin
+  loop
+    v_code := '';
+    for i in 1..8 loop
+      v_code := v_code || substr(v_chars, 1 + floor(random() * length(v_chars))::int, 1);
+    end loop;
+    exit when not exists (select 1 from companies where company_code = v_code);
+  end loop;
+  return v_code;
+end;
+$$;
+
+-- ---------------------------------------------------------------------
+-- 2) HR role: a member with elevated, narrowly-scoped permissions --
+--    view attendance/login analytics, view last-login per member, and
+--    reset passwords for regular ('member') accounts. Cannot touch other
+--    HR accounts or the seller, and cannot do anything admin_* can do.
+-- ---------------------------------------------------------------------
+alter table members add column if not exists role text not null default 'member';
+alter table members add column if not exists khata_eligible boolean not null default false;
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint where conname = 'members_role_check'
+  ) then
+    alter table members add constraint members_role_check check (role in ('member', 'hr'));
+  end if;
+end $$;
+
+-- Mirrors _admin_company / _member_from_token: resolves a live member
+-- session token to a company_id ONLY if that member's role is 'hr'.
+create or replace function _hr_company(p_token uuid)
+returns uuid
+language sql
+security definer
+as $$
+  select m.company_id from members m
+  join member_sessions s on s.member_id = m.id
+  where s.token = p_token and s.expires_at > now() and m.role = 'hr' and m.active;
+$$;
+
+-- admin_upsert_member now also sets role + khata_eligible (seller-only --
+-- this is how HR accounts get created/promoted, and how khata eligibility
+-- gets turned on per member).
+drop function if exists admin_upsert_member(uuid, uuid, int, text, text, text, numeric, boolean, text);
+create or replace function admin_upsert_member(
+  p_token uuid, p_id uuid, p_member_number int, p_name text,
+  p_email text, p_password text, p_daily_amount numeric, p_active boolean,
+  p_role text default null, p_khata_eligible boolean default null
+) returns members
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid;
+  v_member members%rowtype;
+  v_email text := lower(trim(p_email));
+  v_role text := nullif(lower(trim(p_role)), '');
+begin
+  v_company_id := _admin_company(p_token);
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if v_role is not null and v_role not in ('member', 'hr') then
+    raise exception 'Role must be member or hr';
+  end if;
+
+  if p_id is null then
+    if v_email is null or v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'A valid email is required — it is the member''s login and where the morning mail goes';
+    end if;
+    insert into members(company_id, member_number, name, username, password_hash, daily_amount, active, email, role, khata_eligible)
+    values (
+      v_company_id, p_member_number, p_name, v_email,
+      crypt(coalesce(p_password, substr(gen_random_uuid()::text, 1, 8)), gen_salt('bf')),
+      coalesce(p_daily_amount, 250), coalesce(p_active, true), v_email,
+      coalesce(v_role, 'member'), coalesce(p_khata_eligible, false)
+    )
+    returning * into v_member;
+  else
+    if v_email is not null and v_email <> '' and v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+      raise exception 'That does not look like a valid email address';
+    end if;
+    update members set
+      member_number = p_member_number,
+      name = p_name,
+      username = coalesce(nullif(v_email, ''), username),
+      email = coalesce(nullif(v_email, ''), email),
+      password_hash = case when p_password is not null and p_password <> '' then crypt(p_password, gen_salt('bf')) else password_hash end,
+      daily_amount = coalesce(p_daily_amount, daily_amount),
+      active = coalesce(p_active, active),
+      role = coalesce(v_role, role),
+      khata_eligible = coalesce(p_khata_eligible, khata_eligible)
+    where id = p_id and company_id = v_company_id
+    returning * into v_member;
+  end if;
+  return v_member;
+end;
+$$;
+
+-- get_my_profile now also returns role + khata_eligible, so the client
+-- can branch into the HR panel and show the khata option at checkout.
+create or replace function get_my_profile(p_token uuid)
+returns table(member_number int, member_name text, username text, email text, daily_amount numeric,
+              wallet_balance numeric, role text, khata_eligible boolean)
+language sql
+security definer
+as $$
+  select m.member_number, m.name, m.username, m.email, m.daily_amount, m.wallet_balance, m.role, m.khata_eligible
+  from _member_from_token(p_token) m
+  where m.id is not null;
+$$;
+
+-- HR: list regular members in their company, with last-login computed
+-- from login_events. Deliberately excludes password_hash, and excludes
+-- other HR/seller accounts -- HR only ever sees/manages plain members.
+create or replace function hr_list_members(p_token uuid)
+returns table(id uuid, member_number int, name text, email text, active boolean,
+              daily_amount numeric, khata_eligible boolean, last_login timestamptz)
+language sql
+security definer
+as $$
+  select m.id, m.member_number, m.name, m.email, m.active, m.daily_amount, m.khata_eligible,
+         (select max(le.created_at) from login_events le where le.member_id = m.id and le.kind = 'member')
+  from members m
+  where m.company_id = _hr_company(p_token) and m.role = 'member'
+  order by m.member_number;
+$$;
+
+-- HR: reset a regular member's password. Scoped to role='member' targets
+-- only, in HR's own company -- cannot touch other HR accounts or sellers.
+create or replace function hr_reset_member_password(p_token uuid, p_member_id uuid, p_new_password text)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _hr_company(p_token);
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if coalesce(length(p_new_password), 0) < 6 then
+    raise exception 'New password must be at least 6 characters';
+  end if;
+  update members
+  set password_hash = crypt(p_new_password, gen_salt('bf'))
+  where id = p_member_id and company_id = v_company_id and role = 'member';
+  if not found then raise exception 'Member not found'; end if;
+end;
+$$;
+
+-- HR: read-only attendance + login-stat views, same shape as the seller's
+-- so the dashboard-lite panel can reuse existing chart code.
+create or replace function hr_get_attendance(p_token uuid, p_days int default 400)
+returns setof attendance
+language sql
+security definer
+as $$
+  select a.* from attendance a
+  where a.company_id = _hr_company(p_token)
+  and a.visit_date >= (current_date - p_days)
+  order by a.visit_date desc;
+$$;
+
+create or replace function hr_login_stats(p_token uuid)
+returns table(today_logins bigint, today_unique_members bigint,
+              month_logins bigint, total_logins bigint)
+language sql
+security definer
+as $$
+  select
+    count(*) filter (where created_at::date = current_date and kind = 'member'),
+    count(distinct member_id) filter (where created_at::date = current_date and kind = 'member'),
+    count(*) filter (where date_trunc('month', created_at) = date_trunc('month', now()) and kind = 'member'),
+    count(*) filter (where kind = 'member')
+  from login_events
+  where company_id = _hr_company(p_token);
+$$;
+
+-- ---------------------------------------------------------------------
+-- 3) Khata as a real checkout payment method. Members are the identity
+--    here (khata_entries.member_id), not the older phone/customer/wallet
+--    system -- so this is a member-token-authenticated order, mirroring
+--    place_order's stock-locking logic but logging a khata_entries row
+--    per line item instead of debiting a wallet.
+-- ---------------------------------------------------------------------
+create or replace function place_order_khata(
+  p_member_token uuid, p_items jsonb, p_device_id text
+) returns orders
+language plpgsql
+security definer
+as $$
+declare
+  v_member members%rowtype;
+  v_item jsonb;
+  v_product products%rowtype;
+  v_order_items jsonb := '[]'::jsonb;
+  v_total numeric := 0;
+  v_profit numeric := 0;
+  v_token int;
+  v_order orders%rowtype;
+begin
+  select * into v_member from _member_from_token(p_member_token);
+  if v_member.id is null then raise exception 'Not authorized'; end if;
+  if not v_member.khata_eligible then raise exception 'Khata is not enabled for this account'; end if;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_product from products
+      where id = (v_item->>'productId')::uuid and company_id = v_member.company_id
+      for update;
+    if v_product.id is null then raise exception 'Product not found'; end if;
+    if v_product.stock < (v_item->>'qty')::int then
+      raise exception 'Not enough stock for %', v_product.name;
+    end if;
+  end loop;
+
+  for v_item in select * from jsonb_array_elements(p_items) loop
+    select * into v_product from products
+      where id = (v_item->>'productId')::uuid and company_id = v_member.company_id;
+
+    v_order_items := v_order_items || jsonb_build_object(
+      'productId', v_product.id, 'name', v_product.name, 'emoji', v_product.emoji,
+      'qty', (v_item->>'qty')::int, 'price', v_product.price, 'cost', v_product.cost
+    );
+    v_total := v_total + v_product.price * (v_item->>'qty')::int;
+    v_profit := v_profit + (v_product.price - v_product.cost) * (v_item->>'qty')::int;
+
+    update products set stock = stock - (v_item->>'qty')::int where id = v_product.id;
+
+    insert into khata_entries(company_id, member_id, product_name, price, qty, note)
+    values (v_member.company_id, v_member.id, v_product.name, v_product.price, (v_item->>'qty')::int, 'Checkout order');
+  end loop;
+
+  update companies set next_token = next_token + 1 where id = v_member.company_id returning next_token - 1 into v_token;
+
+  insert into orders(company_id, customer_id, device_id, token, items, total, profit, payment_method, source, status)
+  values (v_member.company_id, null, p_device_id, v_token, v_order_items, v_total, v_profit, 'Khata', 'online', 'placed')
+  returning * into v_order;
+
+  return v_order;
+end;
+$$;

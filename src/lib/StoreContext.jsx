@@ -8,6 +8,7 @@ export const paymentApps = [
   { id: "phonepe", name: "PhonePe", emoji: "🟣" },
   { id: "paytm", name: "Paytm", emoji: "🔵" },
   { id: "card", name: "Debit / Credit Card", emoji: "💳" },
+  { id: "khata", name: "Khata (Credit Tab)", emoji: "📒" },
   { id: "cash", name: "Pay at Counter (Cash)", emoji: "💵" },
 ];
 
@@ -270,6 +271,26 @@ export function StoreProvider({ companySlug, children }) {
     [companySlug, customerId, deviceId, refreshWallet]
   );
 
+  // Khata checkout is member-identity based (khata_entries.member_id), not
+  // the phone/customer wallet system placeOrder uses for "Wallet" — so it's
+  // a separate RPC keyed on memberToken instead of customerId.
+  const placeOrderKhata = useCallback(
+    async ({ items }) => {
+      if (!memberToken) return { order: null, error: "Log in to your member account to use Khata." };
+      const { data, error } = await supabase.rpc("place_order_khata", {
+        p_member_token: memberToken,
+        p_items: items,
+        p_device_id: deviceId,
+      });
+      if (error) return { order: null, error: error.message };
+      const order = data;
+      setOrders((prev) => [order, ...prev.filter((o) => o.id !== order.id)]);
+      setMyOrderIds((prev) => [order.id, ...prev]);
+      return { order, error: null };
+    },
+    [memberToken, deviceId]
+  );
+
   const reorderItems = useCallback(
     (order) => {
       const additions = {};
@@ -411,6 +432,7 @@ export function StoreProvider({ companySlug, children }) {
     if (memberToken) await supabase.rpc("member_logout", { p_token: memberToken });
     setMemberToken(null);
     setMemberInfo(null);
+    setMemberProfile(null);
   }, [memberToken]);
 
   const myAttendance = useCallback(async () => {
@@ -425,6 +447,20 @@ export function StoreProvider({ companySlug, children }) {
     const { data } = await supabase.rpc("get_my_profile", { p_token: memberToken });
     return data?.[0] || null;
   }, [memberToken]);
+
+  // Lightweight role/khata_eligible snapshot kept in context so Checkout and
+  // any HR-only UI can branch without each having to call myProfile() themselves.
+  const [memberProfile, setMemberProfile] = useState(null);
+  useEffect(() => {
+    if (!memberToken) {
+      setMemberProfile(null);
+      return;
+    }
+    (async () => {
+      const p = await myProfile();
+      setMemberProfile(p);
+    })();
+  }, [memberToken, myProfile]);
 
   const setMyEmail = useCallback(
     async (email) => {
@@ -558,6 +594,8 @@ export function StoreProvider({ companySlug, children }) {
         p_password: member.password || null,
         p_daily_amount: member.dailyAmount ?? 250,
         p_active: member.active ?? true,
+        p_role: member.role || "member",
+        p_khata_eligible: member.khataEligible ?? false,
       });
       if (error) return { ok: false, error: error.message };
       return { ok: true, member: data };
@@ -571,6 +609,44 @@ export function StoreProvider({ companySlug, children }) {
     },
     [adminToken]
   );
+
+  // ---------- HR: dashboard-lite (attendance/analytics view + password resets) ----------
+  const hrListMembers = useCallback(async () => {
+    if (!memberToken) return [];
+    const { data, error } = await supabase.rpc("hr_list_members", { p_token: memberToken });
+    if (error) return [];
+    return data || [];
+  }, [memberToken]);
+
+  const hrResetMemberPassword = useCallback(
+    async (memberId, newPassword) => {
+      const { error } = await supabase.rpc("hr_reset_member_password", {
+        p_token: memberToken,
+        p_member_id: memberId,
+        p_new_password: newPassword,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
+  const hrAttendance = useCallback(
+    async (days = 400) => {
+      if (!memberToken) return [];
+      const { data, error } = await supabase.rpc("hr_get_attendance", { p_token: memberToken, p_days: days });
+      if (error) return [];
+      return data || [];
+    },
+    [memberToken]
+  );
+
+  const hrLoginStats = useCallback(async () => {
+    if (!memberToken) return null;
+    const { data, error } = await supabase.rpc("hr_login_stats", { p_token: memberToken });
+    if (error) return null;
+    return data?.[0] || null;
+  }, [memberToken]);
 
   // ---------- seller: khata (credit tab) ----------
   const khataSummary = useCallback(async () => {
@@ -727,6 +803,12 @@ export function StoreProvider({ companySlug, children }) {
       addKhataEntry,
       settleKhata,
       myKhata,
+      memberProfile,
+      placeOrderKhata,
+      hrListMembers,
+      hrResetMemberPassword,
+      hrAttendance,
+      hrLoginStats,
     }),
     [
       loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
@@ -738,6 +820,7 @@ export function StoreProvider({ companySlug, children }) {
       myProfile, setMyEmail, changeMyPassword, checkinStatusToday, checkinToday, raiseMyTicket,
       listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
       loginStats, allCompanyLoginCounts, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
+      memberProfile, placeOrderKhata, hrListMembers, hrResetMemberPassword, hrAttendance, hrLoginStats,
     ]
   );
 

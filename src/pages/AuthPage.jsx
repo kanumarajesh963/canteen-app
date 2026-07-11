@@ -361,14 +361,14 @@ function MemberSignupFlow({ onBack }) {
           <Hash size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
           <input
             value={companyCode}
-            onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 6))}
+            onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 10))}
             className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white font-mono tracking-[0.25em]"
             placeholder="Company code"
             required
           />
         </div>
         <p className="text-[11px] text-steel mt-1 pl-1">
-          Your canteen seller shares this 6-character code. (Demo: {DEMO_COMPANY_CODE})
+          Your canteen seller shares this code (up to 10 characters). (Demo: {DEMO_COMPANY_CODE})
         </p>
       </div>
       <div className="relative">

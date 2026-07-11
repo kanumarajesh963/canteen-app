@@ -45,8 +45,11 @@ export default function MembersManager() {
             <div key={m.id} className={`bg-white rounded-2xl border p-4 ${m.active ? "border-ink/5" : "border-brick/30 opacity-60"}`}>
               <div className="flex items-start justify-between">
                 <div>
-                  <p className="font-semibold text-sm">
+                  <p className="font-semibold text-sm flex items-center gap-1.5">
                     #{m.member_number} · {m.name || "(no name)"}
+                    {m.role === "hr" && (
+                      <span className="text-[10px] font-mono uppercase bg-sage/15 text-sage px-1.5 py-0.5 rounded-full">HR</span>
+                    )}
                   </p>
                   <p className="text-xs text-steel font-mono truncate max-w-[170px]">{m.email || m.username}</p>
                 </div>
@@ -66,6 +69,9 @@ export default function MembersManager() {
                 <span>₹{m.daily_amount}/day</span>
                 <span className={m.active ? "text-sage" : "text-brick"}>{m.active ? "Active" : "Inactive"}</span>
               </div>
+              {m.khata_eligible && (
+                <p className="text-[10px] font-mono uppercase text-turmeric-dark mt-1">Khata enabled</p>
+              )}
             </div>
           ))}
         </div>
@@ -94,6 +100,8 @@ function MemberModal({ initial, onClose, onSave }) {
   const [password, setPassword] = useState("");
   const [dailyAmount, setDailyAmount] = useState(initial?.daily_amount ?? 250);
   const [active, setActive] = useState(initial?.active ?? true);
+  const [role, setRole] = useState(initial?.role ?? "member");
+  const [khataEligible, setKhataEligible] = useState(initial?.khata_eligible ?? false);
   const [saving, setSaving] = useState(false);
 
   const submit = async (e) => {
@@ -108,6 +116,8 @@ function MemberModal({ initial, onClose, onSave }) {
       password: password || undefined,
       dailyAmount: Number(dailyAmount),
       active,
+      role,
+      khataEligible,
     });
     setSaving(false);
   };
@@ -172,6 +182,21 @@ function MemberModal({ initial, onClose, onSave }) {
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
             Active
+          </label>
+          <div>
+            <label className="text-xs font-mono uppercase text-steel">Role</label>
+            <select
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric bg-white"
+            >
+              <option value="member">Member</option>
+              <option value="hr">HR — attendance/analytics view + password resets</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={khataEligible} onChange={(e) => setKhataEligible(e.target.checked)} />
+            Allow Khata (credit tab) at checkout
           </label>
           <button
             type="submit"
