@@ -228,7 +228,7 @@ function ResetPasswordModal({ member, onClose }) {
             </p>
             <button
               onClick={onClose}
-              className="mt-4 w-full bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-2.5 rounded-full"
+              className="mt-4 w-full bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold py-2.5 rounded-full"
             >
               Done
             </button>
@@ -246,7 +246,7 @@ function ResetPasswordModal({ member, onClose }) {
             <button
               type="submit"
               disabled={saving}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full transition flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full transition flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={16} className="animate-spin" />}
               Reset password

@@ -95,7 +95,7 @@ export default function SellerSignup() {
             <p className="text-[11px] text-steel mb-4">{copied ? "Copied ✅" : "Tap the code to copy. It's always visible in your dashboard → Company tab."}</p>
             <button
               onClick={() => navigate(`/${created.company_slug}/admin`)}
-              className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-3 rounded-full"
+              className="w-full bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold py-3 rounded-full"
             >
               Go to my dashboard
             </button>
@@ -123,7 +123,7 @@ export default function SellerSignup() {
             <button
               type="submit"
               disabled={submitting || otpCode.length !== 6}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               Verify & create company
@@ -172,7 +172,7 @@ export default function SellerSignup() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               {otpNeeded ? "Send verification code" : "Create company"}

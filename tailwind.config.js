@@ -35,6 +35,9 @@ export default {
         // Replaces the old hardcoded bg-white surfaces (cards, inputs,
         // circular buttons) so they flip to a dark card color in dark mode.
         surface: withCssVar("--color-surface"),
+        // Text color for content sitting on gold (turmeric) buttons/pills.
+        // Stays dark in both themes so it never washes out in dark mode.
+        onbrand: withCssVar("--color-onbrand"),
       },
       fontFamily: {
         sans: ["'Poppins'", "sans-serif"],

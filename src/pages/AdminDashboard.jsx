@@ -265,7 +265,7 @@ function Inventory({ products, setStock, onEdit, onDelete, onAdd }) {
         <p className="text-steel text-sm">{products.length} items on the board. Adjust stock directly for walk-in changes.</p>
         <button
           onClick={onAdd}
-          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-ink text-sm font-semibold px-4 py-2 rounded-full"
+          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-onbrand text-sm font-semibold px-4 py-2 rounded-full"
         >
           <Plus size={16} /> Add item
         </button>
@@ -366,7 +366,7 @@ function Orders({ orders, setOrderStatus }) {
                 {nextStatus && (
                   <button
                     onClick={() => setOrderStatus(o.id, nextStatus)}
-                    className="text-xs font-semibold px-3 py-1.5 rounded-full bg-turmeric hover:bg-turmeric-dark text-ink transition"
+                    className="text-xs font-semibold px-3 py-1.5 rounded-full bg-turmeric hover:bg-turmeric-dark text-onbrand transition"
                   >
                     Mark {STATUS_LABEL[nextStatus]}
                   </button>
@@ -460,7 +460,7 @@ function CounterSale({ products, placeOrder, canFulfill }) {
         <button
           onClick={record}
           disabled={items.length === 0 || submitting}
-          className="bg-turmeric hover:bg-turmeric-dark disabled:bg-steel/30 text-ink font-semibold px-5 py-2.5 rounded-full transition"
+          className="bg-turmeric hover:bg-turmeric-dark disabled:bg-steel/30 text-onbrand font-semibold px-5 py-2.5 rounded-full transition"
         >
           Record sale
         </button>

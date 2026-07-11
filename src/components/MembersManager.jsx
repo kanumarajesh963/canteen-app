@@ -29,7 +29,7 @@ export default function MembersManager() {
         </p>
         <button
           onClick={() => setModal("new")}
-          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-ink text-sm font-semibold px-4 py-2 rounded-full"
+          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-onbrand text-sm font-semibold px-4 py-2 rounded-full"
         >
           <Plus size={16} /> Add member
         </button>
@@ -205,7 +205,7 @@ function MemberModal({ initial, onClose, onSave }) {
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full transition flex items-center justify-center gap-2"
+            className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full transition flex items-center justify-center gap-2"
           >
             {saving && <Loader2 size={16} className="animate-spin" />}
             Save

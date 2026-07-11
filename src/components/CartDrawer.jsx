@@ -85,7 +85,7 @@ export default function CartDrawer({ open, onClose }) {
                   onClose();
                   navigate(`/${company.slug}/checkout`);
                 }}
-                className="flex-1 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-2.5 rounded-full transition"
+                className="flex-1 bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold py-2.5 rounded-full transition"
               >
                 Proceed to Pay
               </button>

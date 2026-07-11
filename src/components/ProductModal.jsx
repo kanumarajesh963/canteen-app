@@ -133,7 +133,7 @@ export default function ProductModal({ initial, onClose, onSave }) {
 
           <button
             type="submit"
-            className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-semibold py-3 rounded-full transition"
+            className="w-full bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold py-3 rounded-full transition"
           >
             {initial ? "Save changes" : "Add to menu"}
           </button>

@@ -24,6 +24,11 @@
   --color-steel: 131 128 122;
   --color-sage: 61 110 165;
   --color-surface: 255 255 255;
+  /* Text that always sits on the gold "turmeric" buttons/pills. The gold
+     background stays light in BOTH themes, so this text must stay dark in
+     both — it must NOT flip with --color-ink (which goes near-white in
+     dark mode and would wash out on gold). */
+  --color-onbrand: 43 38 32;
 
   /* Non-Tailwind-token helpers used directly (charts, autofill, etc.) */
   --chart-grid: rgba(43, 38, 32, 0.08);
@@ -46,6 +51,8 @@ html.dark {
   --color-steel: 156 153 146;
   --color-sage: 91 138 196;
   --color-surface: 44 49 68;
+  /* Stays dark on gold in dark mode too — see :root note above. */
+  --color-onbrand: 43 38 32;
 
   --chart-grid: rgba(240, 237, 228, 0.12);
   --chart-tooltip-bg: #2c3144;

@@ -91,7 +91,7 @@ export default function MemberHome() {
             <button
               onClick={() => answerToday(true)}
               disabled={checkinBusy}
-              className="bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink text-sm font-semibold px-5 py-2 rounded-full inline-flex items-center gap-2"
+              className="bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand text-sm font-semibold px-5 py-2 rounded-full inline-flex items-center gap-2"
             >
               {checkinBusy && <Loader2 size={14} className="animate-spin" />}
               Actually, I'm coming (₹{checkin.amount})
@@ -108,7 +108,7 @@ export default function MemberHome() {
               <button
                 onClick={() => answerToday(true)}
                 disabled={checkinBusy}
-                className="flex-1 bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
+                className="flex-1 bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
               >
                 {checkinBusy && <Loader2 size={14} className="animate-spin" />}✅ Yes
               </button>
@@ -269,7 +269,7 @@ function ChangePasswordModal({ onClose, changeMyPassword }) {
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Password updated ✅</p>
             <p className="text-steel text-sm mb-4">Use the new password next time you log in.</p>
-            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2 rounded-full">
+            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2 rounded-full">
               Done
             </button>
           </div>
@@ -291,7 +291,7 @@ function ChangePasswordModal({ onClose, changeMyPassword }) {
             <button
               type="submit"
               disabled={saving}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={15} className="animate-spin" />}
               Update password
@@ -338,7 +338,7 @@ function RaiseTicketModal({ onClose, raiseMyTicket, onSent }) {
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Ticket raised ✅</p>
             <p className="text-steel text-sm mb-4">Your seller will see it in their dashboard and follow up.</p>
-            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2 rounded-full">
+            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2 rounded-full">
               Done
             </button>
           </div>
@@ -369,7 +369,7 @@ function RaiseTicketModal({ onClose, raiseMyTicket, onSent }) {
             <button
               type="submit"
               disabled={saving}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={15} className="animate-spin" />}
               Submit ticket

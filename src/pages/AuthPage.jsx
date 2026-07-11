@@ -31,12 +31,12 @@ import ThemeToggle from "../components/ThemeToggle";
 // The Member/Seller choice only appears when creating an account.
 // =========================================================================
 
+// A single demo login: one full-access account that can see BOTH the admin
+// dashboard and the member views. Logging in as this member also mints an
+// admin session server-side (member_login_v2 returns an admin_token when the
+// member's role is 'fullaccess'), so "try the demo" needs just this one tap.
 const DEMO_ACCOUNTS = [
-  { label: "Seller", sub: "runs the counter", email: "seller@demo.com", password: "demo123", Icon: Store },
-  { label: "Rahul", sub: "member", email: "rahul@demo.com", password: "demo123", Icon: UserCircle2 },
-  { label: "Priya", sub: "member", email: "priya@demo.com", password: "demo123", Icon: UserCircle2 },
-  { label: "Amit", sub: "member", email: "amit@demo.com", password: "demo123", Icon: UserCircle2 },
-  { label: "Sneha", sub: "member", email: "sneha@demo.com", password: "demo123", Icon: UserCircle2 },
+  { label: "Rajesh Admin", sub: "full access", email: "rajesh@demo.com", password: "demo123", prefer: "member", Icon: Store },
 ];
 export const DEMO_COMPANY_CODE = "DEMO99";
 
@@ -167,7 +167,15 @@ function SignInView({ onCreateMember, onCreateSeller }) {
     if (role === "member") {
       storeMemberSession(session);
       rememberSession("member", session.company_slug);
-      navigate(`/${session.company_slug}/member`);
+      // Full-access members also get an admin session (member_login_v2 mints
+      // an admin_token for role='fullaccess'), so store it and land them on
+      // the dashboard — they can still switch to the member views from the nav.
+      if (session.admin_token) {
+        storeAdminSession({ company_slug: session.company_slug, token: session.admin_token });
+        navigate(`/${session.company_slug}/admin`);
+      } else {
+        navigate(`/${session.company_slug}/member`);
+      }
     } else {
       storeAdminSession(session);
       rememberSession("seller", session.company_slug);
@@ -191,7 +199,7 @@ function SignInView({ onCreateMember, onCreateSeller }) {
     if (!supabaseConfigured) return setError("Backend not connected — the site owner must set the Supabase env vars.");
     setDemoBusy(acc.email);
     setError("");
-    const result = await smartLogin(acc.email, acc.password, acc.sub === "member" ? "member" : "seller");
+    const result = await smartLogin(acc.email, acc.password, acc.prefer ?? (acc.sub === "member" ? "member" : "seller"));
     setDemoBusy(null);
     if (!result) return setError("Demo accounts aren't set up yet — run the latest schema.sql in Supabase.");
     finishLogin(result, true);
@@ -235,7 +243,7 @@ function SignInView({ onCreateMember, onCreateSeller }) {
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold text-base py-3.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
+          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-bold text-base py-3.5 rounded-xl transition flex items-center justify-center gap-2 shadow-sm"
         >
           {submitting && <Loader2 size={17} className="animate-spin" />}
           Login
@@ -415,7 +423,7 @@ function MemberSignupFlow({ onBack }) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         Send verification code
@@ -488,7 +496,7 @@ function SellerSignupFlow({ onBack }) {
         <p className="text-[11px] text-steel mb-4">{copied ? "Copied ✅" : "Tap the code to copy it."}</p>
         <button
           onClick={() => navigate(`/${created.company_slug}/admin`)}
-          className="w-full bg-turmeric hover:bg-turmeric-dark text-ink font-bold py-3.5 rounded-xl"
+          className="w-full bg-turmeric hover:bg-turmeric-dark text-onbrand font-bold py-3.5 rounded-xl"
         >
           Go to my dashboard
         </button>
@@ -547,7 +555,7 @@ function SellerSignupFlow({ onBack }) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         Send verification code
@@ -595,7 +603,7 @@ function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, su
       <button
         type="submit"
         disabled={submitting || otp.length !== 6}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
+        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-bold py-3.5 rounded-xl flex items-center justify-center gap-2 shadow-sm"
       >
         {submitting && <Loader2 size={16} className="animate-spin" />}
         {submitLabel}

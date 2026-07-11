@@ -98,7 +98,7 @@ export default function AttendanceManager() {
           <button
             type="submit"
             disabled={marking || !numbersInput.trim()}
-            className="bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold px-5 py-2.5 rounded-full transition flex items-center gap-2"
+            className="bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold px-5 py-2.5 rounded-full transition flex items-center gap-2"
           >
             {marking && <Loader2 size={16} className="animate-spin" />}
             Mark present

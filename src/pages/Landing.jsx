@@ -49,7 +49,7 @@ export default function Landing() {
           />
           <button
             type="submit"
-            className="bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-5 py-2.5 rounded-full transition"
+            className="bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-5 py-2.5 rounded-full transition"
           >
             Go
           </button>

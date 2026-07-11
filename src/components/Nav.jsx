@@ -70,7 +70,7 @@ export default function Nav({ onCartClick }) {
               to={`${base}/wallet`}
               className={({ isActive }) =>
                 `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
-                  isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+                  isActive ? "bg-turmeric text-onbrand border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
                 }`
               }
             >
@@ -83,7 +83,7 @@ export default function Nav({ onCartClick }) {
             to={`${base}/orders`}
             className={({ isActive }) =>
               `flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
-                isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+                isActive ? "bg-turmeric text-onbrand border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
               }`
             }
           >
@@ -96,7 +96,7 @@ export default function Nav({ onCartClick }) {
               to={`${base}/member`}
               className={({ isActive }) =>
                 `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
-                  isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+                  isActive ? "bg-turmeric text-onbrand border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
                 }`
               }
             >
@@ -110,7 +110,7 @@ export default function Nav({ onCartClick }) {
               to={`${base}/admin`}
               className={({ isActive }) =>
                 `hidden sm:flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-full border transition ${
-                  isActive ? "bg-turmeric text-ink border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
+                  isActive ? "bg-turmeric text-onbrand border-turmeric" : "border-paper/25 text-paper/85 hover:border-paper/60"
                 }`
               }
             >
@@ -121,7 +121,7 @@ export default function Nav({ onCartClick }) {
 
           <button
             onClick={onCartClick}
-            className="relative flex items-center gap-2 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-3.5 py-2 rounded-full transition"
+            className="relative flex items-center gap-2 bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-3.5 py-2 rounded-full transition"
           >
             <ShoppingBasket size={18} />
             <span className="hidden sm:inline">Cart</span>
@@ -138,7 +138,7 @@ export default function Nav({ onCartClick }) {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setMenuOpen((o) => !o)}
-              className="w-9 h-9 rounded-full bg-turmeric text-ink font-bold text-xs flex items-center justify-center hover:opacity-90 active:scale-95 transition"
+              className="w-9 h-9 rounded-full bg-turmeric text-onbrand font-bold text-xs flex items-center justify-center hover:opacity-90 active:scale-95 transition"
               title={displayName}
             >
               {initialsFor(displayName)}
@@ -150,6 +150,43 @@ export default function Nav({ onCartClick }) {
                   <p className="font-semibold text-sm truncate">{displayName}</p>
                   <p className="text-xs text-steel truncate">{company.name}</p>
                 </div>
+
+                {/* Mobile-only quick nav. On ≥sm these live as pills in the
+                    top bar; below sm the bar hides them, so surface them here
+                    (this is how the admin Dashboard stays reachable on phones). */}
+                <div className="sm:hidden border-b border-ink/10">
+                  {isMember && (
+                    <NavLink
+                      to={`${base}/wallet`}
+                      onClick={() => setMenuOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-paper2 transition"
+                    >
+                      <Wallet size={16} />
+                      {customerId ? `Wallet · ₹${walletBalance}` : "Wallet"}
+                    </NavLink>
+                  )}
+                  {isMember && (
+                    <NavLink
+                      to={`${base}/member`}
+                      onClick={() => setMenuOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-paper2 transition"
+                    >
+                      <UserCircle2 size={16} />
+                      Member
+                    </NavLink>
+                  )}
+                  {isAdmin && (
+                    <NavLink
+                      to={`${base}/admin`}
+                      onClick={() => setMenuOpen(false)}
+                      className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-paper2 transition"
+                    >
+                      <LayoutDashboard size={16} />
+                      Dashboard
+                    </NavLink>
+                  )}
+                </div>
+
                 <button
                   onClick={toggle}
                   className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-paper2 transition"

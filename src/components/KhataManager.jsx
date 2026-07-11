@@ -40,7 +40,7 @@ export default function KhataManager() {
         </div>
         <button
           onClick={() => setAddModal(true)}
-          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-ink text-sm font-semibold px-4 py-2 rounded-full shrink-0"
+          className="flex items-center gap-1.5 bg-turmeric hover:bg-turmeric-dark text-onbrand text-sm font-semibold px-4 py-2 rounded-full shrink-0"
         >
           <Plus size={16} /> Add to khata
         </button>
@@ -139,7 +139,7 @@ function AddKhataModal({ members, onClose, addKhataEntry, onSaved }) {
           <div className="text-center py-4">
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Added to their tab ✅</p>
-            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2 rounded-full mt-2">
+            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2 rounded-full mt-2">
               Done
             </button>
           </div>
@@ -204,7 +204,7 @@ function AddKhataModal({ members, onClose, addKhataEntry, onSaved }) {
             <button
               type="submit"
               disabled={saving}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full flex items-center justify-center gap-2"
             >
               {saving && <Loader2 size={16} className="animate-spin" />}
               Add to tab
@@ -275,7 +275,7 @@ function KhataDetailModal({ member, onClose, khataEntriesFor, settleKhata, onSet
           <div className="text-center py-3">
             <CheckCircle2 size={28} className="text-sage mx-auto mb-2" />
             <p className="font-semibold text-sm mb-3">Tab settled ✅</p>
-            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2 rounded-full">
+            <button onClick={onClose} className="bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2 rounded-full">
               Done
             </button>
           </div>

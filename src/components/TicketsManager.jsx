@@ -186,7 +186,7 @@ function ReplyModal({ ticket, onClose, replyTicket, onSent }) {
           <button
             type="submit"
             disabled={saving}
-            className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
+            className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-2.5 rounded-full inline-flex items-center justify-center gap-2"
           >
             {saving && <Loader2 size={15} className="animate-spin" />}
             Send reply &amp; mark resolved

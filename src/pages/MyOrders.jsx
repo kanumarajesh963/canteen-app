@@ -24,7 +24,7 @@ export default function MyOrders() {
         <div className="text-5xl mb-3">🧾</div>
         <h1 className="font-semibold text-xl mb-1">No orders yet</h1>
         <p className="text-steel text-sm mb-5">Everything you book will show up here, with your receipts.</p>
-        <Link to={`/${company.slug}`} className="inline-block bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full transition">
+        <Link to={`/${company.slug}`} className="inline-block bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2.5 rounded-full transition">
           Browse the menu
         </Link>
       </div>

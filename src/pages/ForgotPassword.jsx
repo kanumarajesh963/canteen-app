@@ -88,7 +88,7 @@ export default function ForgotPassword() {
             <p className="text-steel text-sm">Taking you back to Sign In…</p>
             <Link
               to="/"
-              className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full"
+              className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2.5 rounded-full"
             >
               Back to Sign In now
             </Link>
@@ -125,7 +125,7 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               Reset password
@@ -160,7 +160,7 @@ export default function ForgotPassword() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               Send code
@@ -242,7 +242,7 @@ export function ForgotPasswordAskSeller() {
             </p>
             <Link
               to="/"
-              className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full"
+              className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-onbrand font-semibold px-6 py-2.5 rounded-full"
             >
               Back to Sign In
             </Link>
@@ -274,7 +274,7 @@ export function ForgotPasswordAskSeller() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
+              className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-onbrand font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
             >
               {submitting && <Loader2 size={16} className="animate-spin" />}
               Send reset request

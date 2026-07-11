@@ -1952,16 +1952,9 @@ begin
   update companies set company_code = _generate_company_code()
   where id = v_company_id and company_code is null;
 
-  -- 4 demo members (high member numbers so they never collide with real ones)
-  insert into members (company_id, member_number, name, username, email, password_hash, daily_amount, active)
-  values
-    (v_company_id, 9001, 'Rahul Verma',  'rahul@demo.com', 'rahul@demo.com', crypt('demo123', gen_salt('bf')), 250, true),
-    (v_company_id, 9002, 'Priya Sharma', 'priya@demo.com', 'priya@demo.com', crypt('demo123', gen_salt('bf')), 250, true),
-    (v_company_id, 9003, 'Amit Patel',   'amit@demo.com',  'amit@demo.com',  crypt('demo123', gen_salt('bf')), 250, true),
-    (v_company_id, 9004, 'Sneha Reddy',  'sneha@demo.com', 'sneha@demo.com', crypt('demo123', gen_salt('bf')), 250, true)
-  on conflict (company_id, username) do update
-    set password_hash = excluded.password_hash, active = true,
-        name = excluded.name, email = excluded.email;
+  -- NOTE: the single demo member ("Rajesh Admin", full access) is seeded near
+  -- the end of this file — it needs the members.role column + the 'fullaccess'
+  -- constraint, which are both added later. See the "Demo member" block below.
 end $$;
 
 -- =========================================================================
@@ -2735,3 +2728,41 @@ begin
   if not found then raise exception 'Member not found'; end if;
 end;
 $$;
+-- =========================================================================
+-- Demo member — ONE full-access account: "Rajesh Admin".
+-- =========================================================================
+-- Placed at the very end on purpose: it needs the members.role column and
+-- the 'fullaccess' value in members_role_check, both added earlier in v9/v11.
+-- Logging in as this member (email + password) also mints an admin session,
+-- so this single account demonstrates BOTH the seller/admin dashboard and the
+-- member views. Safe to re-run.
+--
+--   Login:  rajesh@demo.com  /  demo123
+-- =========================================================================
+do $$
+declare
+  v_company_id uuid;
+begin
+  select id into v_company_id from companies where slug = 'demo';
+  if v_company_id is null then
+    return; -- no demo company (e.g. after cleanup) → nothing to seed
+  end if;
+
+  -- Remove the old hardcoded demo members from any previous run, so re-running
+  -- this schema on an existing DB clears Rahul/Priya/Amit/Sneha automatically.
+  delete from members
+  where company_id = v_company_id
+    and username in ('rahul@demo.com', 'priya@demo.com', 'amit@demo.com', 'sneha@demo.com');
+
+  -- Upsert the single full-access demo member.
+  insert into members (company_id, member_number, name, username, email,
+                       password_hash, daily_amount, active, role, wallet_balance)
+  values (v_company_id, 9001, 'Rajesh Admin', 'rajesh@demo.com', 'rajesh@demo.com',
+          crypt('demo123', gen_salt('bf')), 250, true, 'fullaccess', 250)
+  on conflict (company_id, username) do update
+    set password_hash = excluded.password_hash,
+        name          = excluded.name,
+        email         = excluded.email,
+        role          = 'fullaccess',
+        active        = true;
+end $$;
