@@ -10,15 +10,17 @@
 //    (₹250 by default) by recording attendance for today.
 //
 // Required secrets (Supabase Dashboard → Edge Functions → Secrets):
-//   RESEND_API_KEY  — free key from https://resend.com (100 emails/day free)
-//   APP_URL         — your deployed app, e.g. https://canteen-app-pi.vercel.app
-//   FROM_EMAIL      — e.g. "Canteen <onboarding@resend.dev>" (works out of the
-//                     box for testing; verify your own domain for production)
+//   GMAIL_USER          — the Gmail address you're sending FROM
+//   GMAIL_APP_PASSWORD  — App Password for that Gmail account
+//                          (see supabase/functions/_shared/email.ts)
+//   APP_URL             — your deployed app, e.g.
+//                          https://canteen-app-pi.vercel.app
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 // =========================================================================
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 Deno.serve(async (req) => {
   try {
@@ -27,12 +29,10 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
     const APP_URL = (Deno.env.get("APP_URL") || "").replace(/\/$/, "");
-    const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Canteen <onboarding@resend.dev>";
 
-    if (!RESEND_API_KEY || !APP_URL) {
-      return json({ error: "Set RESEND_API_KEY and APP_URL secrets first (see README)." }, 500);
+    if (!APP_URL) {
+      return json({ error: "Set APP_URL secret first (see README)." }, 500);
     }
 
     // Create today's pending check-ins and get everyone who needs an email.
@@ -59,22 +59,14 @@ Deno.serve(async (req) => {
           <p style="color:#999;font-size:12px">This link works only for today. If the buttons don't work, open: ${yesUrl}</p>
         </div>`;
 
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${RESEND_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: FROM_EMAIL,
-          to: [r.email],
-          subject: `Coming to office today? — ${r.company_name}`,
-          html,
-        }),
+      const result = await sendEmail({
+        to: r.email,
+        subject: `Coming to office today? — ${r.company_name}`,
+        html,
       });
 
-      if (res.ok) sent++;
-      else failures.push(`${r.email}: ${await res.text()}`);
+      if (result.ok) sent++;
+      else failures.push(`${r.email}: ${result.error}`);
     }
 
     return json({ pending: rows?.length ?? 0, sent, failures });

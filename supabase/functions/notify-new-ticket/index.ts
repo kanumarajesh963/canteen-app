@@ -8,24 +8,22 @@
 // who raised it, and what it's about.
 //
 // Required secrets (Supabase Dashboard → Edge Functions → Secrets):
-//   RESEND_API_KEY — same key used by daily-checkin-email
-//   FROM_EMAIL     — e.g. "Canteen <onboarding@resend.dev>"
-//   SUPPORT_EMAIL  — where new-ticket alerts go (default: support@canteen.com)
+//   GMAIL_USER          — the Gmail address you're sending FROM
+//   GMAIL_APP_PASSWORD  — App Password for that Gmail account
+//                          (see supabase/functions/_shared/email.ts)
+//   SUPPORT_EMAIL       — where new-ticket alerts go
+//                          (e.g. "kanumarajesh143@gmail.com")
 //
 // This function trusts its caller (the Postgres trigger, authenticated with
 // your service role key — see app_config in schema.sql) rather than end
 // users, so it does not need SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY itself.
 // =========================================================================
 
+import { sendEmail } from "../_shared/email.ts";
+
 Deno.serve(async (req) => {
   try {
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Canteen <onboarding@resend.dev>";
     const SUPPORT_EMAIL = Deno.env.get("SUPPORT_EMAIL") || "support@canteen.com";
-
-    if (!RESEND_API_KEY) {
-      return json({ error: "Set RESEND_API_KEY secret first (see README)." }, 500);
-    }
 
     const body = await req.json().catch(() => ({}));
     const {
@@ -53,22 +51,14 @@ Deno.serve(async (req) => {
         <p style="color:#999;font-size:12px;margin-top:20px">Reply and manage this from the seller dashboard → Tickets tab.</p>
       </div>`;
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [SUPPORT_EMAIL],
-        subject: `${isPasswordReset ? "[Password reset] " : "[Ticket] "}${subject} — ${company_name}`,
-        html,
-      }),
+    const result = await sendEmail({
+      to: SUPPORT_EMAIL,
+      subject: `${isPasswordReset ? "[Password reset] " : "[Ticket] "}${subject} — ${company_name}`,
+      html,
     });
 
-    if (!res.ok) {
-      return json({ error: await res.text() }, 500);
+    if (!result.ok) {
+      return json({ error: result.error }, 500);
     }
     return json({ sent: true });
   } catch (e) {

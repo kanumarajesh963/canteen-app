@@ -12,17 +12,16 @@
 // affected either way.
 //
 // Required secrets (Supabase Dashboard → Edge Functions → Secrets):
-//   RESEND_API_KEY — same key used by the other email functions
-//   FROM_EMAIL     — must use a domain verified in Resend, e.g.
-//                    "Corporate Canteen <noreply@yourdomain.com>".
-//                    Using the default onboarding@resend.dev here will
-//                    silently only deliver to your own Resend account
-//                    email — see /resend.com/domains to verify a domain.
+//   GMAIL_USER          — the Gmail address you're sending FROM
+//   GMAIL_APP_PASSWORD  — App Password for that Gmail account
+//                          (see supabase/functions/_shared/email.ts)
 //
 // Deploy with JWT verification OFF (members aren't logged in with a
 // Supabase auth session — they use their own token system):
 //   supabase functions deploy send-welcome-email --no-verify-jwt
 // =========================================================================
+
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -44,12 +43,6 @@ Deno.serve(async (req) => {
       return json({ error: "A valid email is required" }, 400);
     }
 
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Corporate Canteen <onboarding@resend.dev>";
-    if (!RESEND_API_KEY) {
-      return json({ error: "Set RESEND_API_KEY secret first (see README)." }, 500);
-    }
-
     const displayName = escapeHtml(name?.trim() || "there");
     const company = escapeHtml(companyName?.trim() || "your company canteen");
 
@@ -65,21 +58,13 @@ Deno.serve(async (req) => {
         <p style="color:#999;font-size:12px;margin-top:20px">If you didn't create this account, you can safely ignore this email.</p>
       </div>`;
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [email],
-        subject: `Welcome to ${companyName?.trim() || "the canteen"} — ₹${WELCOME_BONUS} added to your wallet`,
-        html,
-      }),
+    const result = await sendEmail({
+      to: email,
+      subject: `Welcome to ${companyName?.trim() || "the canteen"} — ₹${WELCOME_BONUS} added to your wallet`,
+      html,
     });
 
-    if (!res.ok) return json({ error: await res.text() }, 500);
+    if (!result.ok) return json({ error: result.error }, 500);
     return json({ ok: true });
   } catch (e) {
     return json({ error: String(e) }, 500);

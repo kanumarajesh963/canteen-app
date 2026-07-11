@@ -10,8 +10,9 @@
 // check which emails are registered.
 //
 // Required secrets (Supabase Dashboard → Edge Functions → Secrets):
-//   RESEND_API_KEY — same key used by daily-checkin-email
-//   FROM_EMAIL     — e.g. "Canteen <onboarding@resend.dev>"
+//   GMAIL_USER          — the Gmail address you're sending FROM
+//   GMAIL_APP_PASSWORD  — App Password for that Gmail account
+//                          (see supabase/functions/_shared/email.ts)
 //
 // SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are injected automatically.
 //
@@ -21,6 +22,7 @@
 // =========================================================================
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import { sendEmail } from "../_shared/email.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -46,9 +48,6 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-    const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "Canteen <onboarding@resend.dev>";
-
     const { data, error } = await supabase.rpc("generate_password_otp", { p_email: email });
     if (error) return json({ error: error.message }, 500);
 
@@ -58,10 +57,6 @@ Deno.serve(async (req) => {
     // don't let this endpoint be used to enumerate registered emails.
     if (!row?.found) {
       return json({ ok: true, message: "If that email is registered, a code has been sent." });
-    }
-
-    if (!RESEND_API_KEY) {
-      return json({ error: "Set RESEND_API_KEY secret first (see README)." }, 500);
     }
 
     const html = `
@@ -75,21 +70,13 @@ Deno.serve(async (req) => {
         <p style="color:#999;font-size:12px">Didn't request this? You can safely ignore this email.</p>
       </div>`;
 
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: FROM_EMAIL,
-        to: [email],
-        subject: "Your password reset code",
-        html,
-      }),
+    const result = await sendEmail({
+      to: email,
+      subject: "Your password reset code",
+      html,
     });
 
-    if (!res.ok) return json({ error: await res.text() }, 500);
+    if (!result.ok) return json({ error: result.error }, 500);
     return json({ ok: true, message: "If that email is registered, a code has been sent." });
   } catch (e) {
     return json({ error: String(e) }, 500);
