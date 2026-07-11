@@ -250,16 +250,20 @@ function SignInView({ onCreateMember, onCreateSeller }) {
         </button>
       </form>
 
-      {/* One click straight to the right signup — no in-between screen */}
-      <div className="flex items-center justify-center gap-2 text-sm mt-4">
-        <span className="text-steel">New here?</span>
-        <button onClick={onCreateMember} className="text-turmeric-dark font-semibold hover:underline">
-          Join as member
-        </button>
-        <span className="text-ink/20">|</span>
-        <button onClick={onCreateSeller} className="text-turmeric-dark font-semibold hover:underline">
-          Create canteen
-        </button>
+      {/* One click straight to the right signup — no in-between screen.
+          flex-wrap + whitespace-nowrap so labels never break mid-phrase on
+          narrow devices; they reflow as whole phrases instead. */}
+      <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-sm mt-4">
+        <span className="text-steel whitespace-nowrap">New here?</span>
+        <span className="whitespace-nowrap">
+          <button onClick={onCreateMember} className="text-turmeric-dark font-semibold hover:underline">
+            Join as member
+          </button>
+          <span className="text-ink/20 mx-2">|</span>
+          <button onClick={onCreateSeller} className="text-turmeric-dark font-semibold hover:underline">
+            Create canteen
+          </button>
+        </span>
       </div>
 
       {/* Demo: one tap signs you straight in */}
