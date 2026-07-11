@@ -7,12 +7,8 @@ import Checkout from "./pages/Checkout";
 import Success from "./pages/Success";
 import MyOrders from "./pages/MyOrders";
 import WalletPage from "./pages/Wallet";
-import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
-import Landing from "./pages/Landing";
-import SellerLoginGlobal from "./pages/SellerLoginGlobal";
-import SellerSignup from "./pages/Sellersignup";
-import MemberLoginGlobal from "./pages/MemberLoginGlobal";
+import AuthPage from "./pages/AuthPage";
 import MemberHome from "./pages/MemberHome";
 import ForgotPassword, { ForgotPasswordAskSeller } from "./pages/ForgotPassword";
 import CheckinPage from "./pages/CheckinPage";
@@ -22,13 +18,24 @@ import { supabaseConfigured } from "./lib/supabaseClient";
 export default function App() {
   return (
     <Routes>
-      <Route path="/" element={<Landing />} />
-      <Route path="/seller/login" element={<SellerLoginGlobal />} />
-      <Route path="/seller/signup" element={<SellerSignup />} />
-      <Route path="/member/login" element={<MemberLoginGlobal />} />
-      <Route path="/member/forgot" element={<ForgotPassword />} />
-      <Route path="/member/forgot/ask-seller" element={<ForgotPasswordAskSeller />} />
+      {/* The FIRST SCREEN: all sign in / sign up / OTP lives here. */}
+      <Route path="/" element={<AuthPage />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
+
+      {/* Forgot password (own screen, linked from Sign In) */}
+      <Route path="/forgot" element={<ForgotPassword />} />
+      <Route path="/forgot/ask-seller" element={<ForgotPasswordAskSeller />} />
+
+      {/* Old bookmarked auth URLs → the unified auth page */}
+      <Route path="/member/login" element={<Navigate to="/" replace />} />
+      <Route path="/seller/login" element={<Navigate to="/" replace />} />
+      <Route path="/seller/signup" element={<Navigate to="/" replace />} />
+      <Route path="/member/forgot" element={<Navigate to="/forgot" replace />} />
+      <Route path="/member/forgot/ask-seller" element={<Navigate to="/forgot/ask-seller" replace />} />
+
+      {/* Public by design: opened from the daily check-in email's secret token */}
       <Route path="/checkin/:token" element={<CheckinPage />} />
+
       <Route path="/:companySlug/*" element={<CompanyApp />} />
     </Routes>
   );
@@ -44,7 +51,7 @@ function CompanyApp() {
 }
 
 function CompanyShell() {
-  const { loading, notFound, company } = useStore();
+  const { loading, notFound, company, isAdmin, isMember } = useStore();
   const [cartOpen, setCartOpen] = useState(false);
 
   if (!supabaseConfigured) {
@@ -54,8 +61,9 @@ function CompanyShell() {
           <p className="text-2xl mb-2">⚙️</p>
           <h1 className="font-chalk text-2xl mb-2">Backend not connected</h1>
           <p className="text-steel text-sm max-w-md">
-            This build needs Supabase credentials. Copy <code>.env.example</code> to <code>.env</code>, fill in your
-            project URL and anon key, then rebuild. See README.md → Backend setup.
+            This build needs Supabase credentials. Set <code>VITE_SUPABASE_URL</code> and{" "}
+            <code>VITE_SUPABASE_ANON_KEY</code> in Vercel → Settings → Environment Variables (one-time setup by
+            the site owner) and redeploy. See README.md → Backend setup.
           </p>
         </div>
       </div>
@@ -77,13 +85,17 @@ function CompanyShell() {
           <p className="text-4xl mb-2">🔍</p>
           <h1 className="font-chalk text-3xl mb-2">No canteen here</h1>
           <p className="text-steel text-sm max-w-sm">
-            There's no company set up at this address yet. Check the link, or ask your admin to create it in
-            Supabase (see supabase/schema.sql).
+            There's no company set up at this address. Check the link, or sign up as a seller to create one.
           </p>
         </div>
       </div>
     );
   }
+
+  // ---- AUTH GATE: no browsing without an account. Members and sellers only.
+  // Logged-out visitors (including anyone who just logged out) always land
+  // back on the first screen.
+  if (!isAdmin && !isMember) return <Navigate to="/" replace />;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -97,8 +109,9 @@ function CompanyShell() {
           <Route path="/orders" element={<MyOrders />} />
           <Route path="/wallet" element={<WalletPage />} />
           <Route path="/member" element={<MemberHome />} />
-          <Route path="/admin/login" element={<AdminLogin />} />
-          <Route path="/admin" element={<AdminDashboard />} />
+          {/* Old per-company admin login → unified auth page */}
+          <Route path="/admin/login" element={<Navigate to="/" replace />} />
+          <Route path="/admin" element={isAdmin ? <AdminDashboard /> : <Navigate to="/" replace />} />
           <Route path="*" element={<Navigate to="." replace />} />
         </Routes>
       </main>

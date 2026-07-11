@@ -4,6 +4,7 @@ import {
   CalendarCheck, LogOut, IndianRupee, KeyRound, LifeBuoy, Loader2, X, CheckCircle2, MessageSquareReply,
 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
+import { clearRememberedSession } from "../lib/globalAuth";
 import StatCard from "../components/StatCard";
 import PasswordInput from "../components/PasswordInput";
 
@@ -36,7 +37,7 @@ export default function MemberHome() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMember]);
 
-  if (!isMember) return <Navigate to="/member/login" replace />;
+  if (!isMember) return <Navigate to="/" replace />;
 
   const now = new Date();
   const thisMonthTotal = records
@@ -68,7 +69,12 @@ export default function MemberHome() {
           </p>
         </div>
         <button
-          onClick={logoutMember}
+          onClick={async () => {
+            await logoutMember();
+            localStorage.removeItem(`canteen_member_token_${company.slug}`);
+            localStorage.removeItem(`canteen_member_token_${company.slug}_info`);
+            clearRememberedSession();
+          }}
           className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border border-ink/15 hover:bg-paper2"
         >
           <LogOut size={13} /> Log out

@@ -106,6 +106,33 @@ export function StoreProvider({ companySlug, children }) {
     else setLoading(false);
   }, [loadAll]);
 
+  // ---------- validate stored sessions once per visit ----------
+  // Tokens live in localStorage but expire server-side (12h). If a stored
+  // token is dead, clear it so the auth gate sends the user back to the
+  // Sign In screen instead of rendering an empty, broken app.
+  useEffect(() => {
+    if (!supabaseConfigured) return;
+    (async () => {
+      const admin = localStorage.getItem(adminKey);
+      if (admin) {
+        const { data, error } = await supabase.rpc("admin_session_valid", { p_token: admin });
+        // Only clear on a definite "false" — network errors or a not-yet-run
+        // migration must never log people out.
+        if (!error && data === false) setAdminToken(null);
+      }
+      const member = localStorage.getItem(memberKey);
+      if (member) {
+        const { data, error } = await supabase.rpc("member_session_valid", { p_token: member });
+        if (!error && data === false) {
+          setMemberToken(null);
+          setMemberInfo(null);
+        }
+      }
+    })();
+    // Run once per company mount — keys are stable for a given slug.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [adminKey, memberKey]);
+
   // ---------- realtime: products + orders for this company ----------
   useEffect(() => {
     if (!company) return;

@@ -17,6 +17,7 @@ import {
 } from "recharts";
 import { IndianRupee, TrendingUp, ShoppingBag, PackageMinus, Plus, Pencil, Trash2, LogOut, AlertTriangle } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
+import { clearRememberedSession } from "../lib/globalAuth";
 import { summarize, dailySeries, monthlySeries, topSellers, categoryBreakdown } from "../lib/analytics";
 import StatCard from "../components/StatCard";
 import ProductModal from "../components/ProductModal";
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
   const sellers = useMemo(() => topSellers(orders), [orders]);
   const catData = useMemo(() => categoryBreakdown(orders, products), [orders, products]);
 
-  if (!isAdmin) return <Navigate to={`/${company.slug}/admin/login`} replace />;
+  if (!isAdmin) return <Navigate to="/" replace />;
 
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
@@ -53,7 +54,11 @@ export default function AdminDashboard() {
           <p className="text-steel text-sm">Track sales, manage stock, and log counter purchases for {company.name}.</p>
         </div>
         <button
-          onClick={logout}
+          onClick={async () => {
+            await logout();
+            localStorage.removeItem(`canteen_admin_token_${company.slug}`);
+            clearRememberedSession();
+          }}
           className="flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-full border border-ink/15 hover:bg-paper2"
         >
           <LogOut size={15} /> Log out

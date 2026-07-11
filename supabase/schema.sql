@@ -1792,3 +1792,117 @@ begin
   return query select v_token, v_slug, trim(p_company_name), v_code;
 end;
 $$;
+
+-- =========================================================================
+-- v8 add-on: production auth flow
+--   * Seller signup OTP is now ALWAYS required.
+--   * Members can self-signup with their company's code + emailed OTP.
+--   * Backfills company_code for companies created before v7.
+-- =========================================================================
+-- Safe to re-run — everything below is idempotent. Run the WHOLE file again
+-- in the SQL Editor and only this new section changes anything.
+-- =========================================================================
+
+-- 1) OTP verification is mandatory for seller signup from now on.
+insert into app_config (key, value) values ('seller_signup_otp_required', 'true')
+on conflict (key) do update set value = 'true';
+
+-- 2) Older companies (created before v7) never got a company_code — give
+--    them one so their members can self-signup too.
+update companies set company_code = _generate_company_code() where company_code is null;
+
+-- 3) Member self-signup: email + password + name + COMPANY CODE + OTP.
+--    The OTP reuses the same signup_otps table + send-seller-signup-otp
+--    Edge Function (it just emails a code — purpose-agnostic).
+--    Returns a ready-to-use member session, exactly like member_login_v2.
+create or replace function member_self_signup(
+  p_email text, p_password text, p_name text, p_company_code text, p_otp text
+)
+returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
+language plpgsql
+security definer
+as $$
+declare
+  v_email text := lower(trim(p_email));
+  v_company companies%rowtype;
+  v_otp signup_otps%rowtype;
+  v_number int;
+  v_member members%rowtype;
+  v_token uuid;
+begin
+  if v_email !~ '^[^@\s]+@[^@\s]+\.[^@\s]+$' then
+    raise exception 'A valid email is required';
+  end if;
+  if coalesce(length(p_password), 0) < 6 then
+    raise exception 'Password must be at least 6 characters';
+  end if;
+  if coalesce(trim(p_company_code), '') = '' then
+    raise exception 'Company code is required — ask your canteen seller for it';
+  end if;
+
+  select * into v_company from companies
+  where upper(companies.company_code) = upper(trim(p_company_code));
+  if v_company.id is null then
+    raise exception 'That company code doesn''t match any canteen — double-check it with your seller';
+  end if;
+
+  if exists (
+    select 1 from members m
+    where m.company_id = v_company.id
+      and (lower(m.username) = v_email or lower(m.email) = v_email)
+  ) then
+    raise exception 'An account with that email already exists here — try signing in instead';
+  end if;
+
+  -- OTP is always required for member signup.
+  select * into v_otp from signup_otps
+  where lower(email) = v_email
+    and otp_code = trim(coalesce(p_otp, ''))
+    and not used
+    and expires_at > now()
+  order by created_at desc
+  limit 1;
+  if v_otp.id is null then
+    raise exception 'That code is invalid or has expired — request a new one';
+  end if;
+  update signup_otps set used = true where id = v_otp.id;
+
+  select coalesce(max(m.member_number), 0) + 1 into v_number
+  from members m where m.company_id = v_company.id;
+
+  insert into members(company_id, member_number, name, username, email, password_hash, daily_amount, active)
+  values (
+    v_company.id, v_number, nullif(trim(p_name), ''), v_email, v_email,
+    crypt(p_password, gen_salt('bf')), 250, true
+  )
+  returning * into v_member;
+
+  insert into member_sessions(member_id) values (v_member.id)
+  returning member_sessions.token into v_token;
+  insert into login_events(company_id, member_id, kind) values (v_company.id, v_member.id, 'member');
+
+  return query select v_token, v_member.id, v_member.member_number, v_member.name, v_company.slug, v_company.name;
+end;
+$$;
+
+-- 4) Cheap "is my stored session still valid?" checks — the app calls these
+--    on load so an expired token sends you back to Sign In instead of
+--    showing an empty, broken screen.
+create or replace function admin_session_valid(p_token uuid)
+returns boolean
+language sql
+security definer
+as $$
+  select _admin_company(p_token) is not null;
+$$;
+
+create or replace function member_session_valid(p_token uuid)
+returns boolean
+language sql
+security definer
+as $$
+  select exists (
+    select 1 from member_sessions
+    where token = p_token and expires_at > now()
+  );
+$$;

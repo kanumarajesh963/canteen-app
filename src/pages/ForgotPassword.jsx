@@ -1,17 +1,17 @@
-import React, { useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { KeyRound, Loader2, CheckCircle2, Mail } from "lucide-react";
 import { supabaseConfigured, supabase } from "../lib/supabaseClient";
-import { useStore } from "../lib/StoreContext";
+import { requestPasswordOtp, resetPasswordWithOtp } from "../lib/globalAuth";
 import PasswordInput from "../components/PasswordInput";
 
 // Forgot password — OTP flow:
 //   1) Enter the email you log in with → we email a 6-digit code.
-//   2) Enter the code + a new password → done, log in right away.
-// If they can't access that inbox, "Ask the seller instead" falls back to
-// the original ticket-based flow (seller resets it manually).
+//   2) Enter the code + a new password → done.
+//   3) Auto-redirect back to the Sign In screen.
+// NOTE: this page lives OUTSIDE StoreProvider, so it must never call
+// useStore() — it uses the standalone helpers from globalAuth instead.
 export default function ForgotPassword() {
-  const { requestPasswordOtp, resetPasswordWithOtp } = useStore();
   const [step, setStep] = useState(1); // 1: email, 2: code + new password, 3: done
   const [email, setEmail] = useState("");
   const [otp, setOtp] = useState("");
@@ -19,11 +19,19 @@ export default function ForgotPassword() {
   const [confirmPw, setConfirmPw] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
+
+  // After a successful reset, send them back to Sign In automatically.
+  useEffect(() => {
+    if (step !== 3) return;
+    const t = setTimeout(() => navigate("/", { replace: true }), 2500);
+    return () => clearTimeout(t);
+  }, [step, navigate]);
 
   const sendCode = async (e) => {
     e.preventDefault();
     if (!supabaseConfigured) {
-      setError("Backend not connected yet — see README.md → Backend setup.");
+      setError("Backend not connected — the site owner must set the Supabase env vars.");
       return;
     }
     if (!email.trim()) {
@@ -77,12 +85,12 @@ export default function ForgotPassword() {
           <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center">
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Password reset ✅</p>
-            <p className="text-steel text-sm">Log in with your new password.</p>
+            <p className="text-steel text-sm">Taking you back to Sign In…</p>
             <Link
-              to="/member/login"
+              to="/"
               className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full"
             >
-              Back to login
+              Back to Sign In now
             </Link>
           </div>
         ) : step === 2 ? (
@@ -162,14 +170,14 @@ export default function ForgotPassword() {
 
         <p className="text-center text-sm text-steel mt-6">
           Remembered it?{" "}
-          <Link to="/member/login" className="text-turmeric-dark font-medium hover:underline">
-            Member login
+          <Link to="/" className="text-turmeric-dark font-medium hover:underline">
+            Back to Sign In
           </Link>
         </p>
         {step !== 3 && (
           <p className="text-center text-xs text-steel mt-2">
             Can't access that inbox?{" "}
-            <Link to="/member/forgot/ask-seller" className="text-turmeric-dark hover:underline">
+            <Link to="/forgot/ask-seller" className="text-turmeric-dark hover:underline">
               Ask the seller to reset it instead
             </Link>
           </p>
@@ -179,8 +187,8 @@ export default function ForgotPassword() {
   );
 }
 
-// Fallback: the original flow — raises a ticket for the seller to handle
-// manually, for members whose email inbox they can't reach right now.
+// Fallback: raises a ticket for the seller to handle manually, for members
+// whose email inbox is unreachable right now. (No useStore here either.)
 export function ForgotPasswordAskSeller() {
   const [email, setEmail] = useState("");
   const [contact, setContact] = useState("");
@@ -191,7 +199,7 @@ export function ForgotPasswordAskSeller() {
   const submit = async (e) => {
     e.preventDefault();
     if (!supabaseConfigured) {
-      setError("Backend not connected yet — see README.md → Backend setup.");
+      setError("Backend not connected — the site owner must set the Supabase env vars.");
       return;
     }
     if (!email.trim()) {
@@ -230,13 +238,13 @@ export function ForgotPasswordAskSeller() {
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Request sent ✅</p>
             <p className="text-steel text-sm">
-              Your seller has been notified. Once they reset it, log in with your new password.
+              Your seller has been notified. Once they reset it, sign in with your new password.
             </p>
             <Link
-              to="/member/login"
+              to="/"
               className="inline-block mt-4 bg-turmeric hover:bg-turmeric-dark text-ink font-semibold px-6 py-2.5 rounded-full"
             >
-              Back to login
+              Back to Sign In
             </Link>
           </div>
         ) : (
@@ -275,7 +283,7 @@ export function ForgotPasswordAskSeller() {
         )}
 
         <p className="text-center text-sm text-steel mt-6">
-          <Link to="/member/forgot" className="text-turmeric-dark font-medium hover:underline">
+          <Link to="/forgot" className="text-turmeric-dark font-medium hover:underline">
             ← Try the email code instead
           </Link>
         </p>

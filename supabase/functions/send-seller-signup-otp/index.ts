@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
     const html = `
       <div style="font-family:Arial,Helvetica,sans-serif;max-width:420px;margin:0 auto;padding:24px;border:1px solid #eee;border-radius:12px">
         <h2 style="margin:0 0 4px">Verify your email</h2>
-        <p style="color:#555;margin:0 0 16px">One more step to create your canteen.</p>
+        <p style="color:#555;margin:0 0 16px">One more step to create your account.</p>
         <p style="font-size:14px;color:#333">Use this code to finish signing up. It expires in <b>10 minutes</b>.</p>
         <div style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;background:#faf9f6;border-radius:12px;padding:20px 0;margin:20px 0">
           ${escapeHtml(String(otpCode))}

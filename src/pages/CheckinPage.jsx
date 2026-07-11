@@ -126,7 +126,7 @@ export default function CheckinPage() {
         )}
 
         <p className="text-center text-sm text-steel mt-8">
-          <Link to="/member/login" className="text-turmeric-dark font-medium hover:underline">
+          <Link to="/" className="text-turmeric-dark font-medium hover:underline">
             Member login
           </Link>
         </p>
