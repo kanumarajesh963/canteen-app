@@ -2477,3 +2477,29 @@ begin
   return v_order;
 end;
 $$;
+
+-- =========================================================================
+-- v10 add-on: seller drill-down — per-member login details for YOUR OWN
+-- company only. This intentionally does NOT let a seller see another
+-- company's individual members — admin_all_company_login_counts (above)
+-- stays counts-only for that. This one is scoped by _admin_company(p_token),
+-- exactly like admin_list_members, so it can only ever return your own
+-- company's roster.
+-- =========================================================================
+create or replace function admin_member_login_details(p_token uuid)
+returns table(
+  member_id uuid, member_number int, member_name text, email text, active boolean,
+  last_login timestamptz, logins_today bigint, logins_total bigint
+)
+language sql
+security definer
+as $$
+  select
+    m.id, m.member_number, m.name, m.email, m.active,
+    (select max(le.created_at) from login_events le where le.member_id = m.id and le.kind = 'member'),
+    (select count(*) from login_events le where le.member_id = m.id and le.kind = 'member' and le.created_at::date = current_date),
+    (select count(*) from login_events le where le.member_id = m.id and le.kind = 'member')
+  from members m
+  where m.company_id = _admin_company(p_token)
+  order by m.member_number;
+$$;
