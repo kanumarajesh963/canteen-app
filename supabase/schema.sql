@@ -1979,6 +1979,9 @@ alter table member_wallet_transactions enable row level security;
 
 -- Re-defines member_self_signup (see earlier definition) to also grant the
 -- ₹250 signup bonus and log it as a wallet transaction.
+-- (Return type gains a wallet_balance column, so the old function must be
+-- dropped first — CREATE OR REPLACE cannot change an OUT-param row type.)
+drop function if exists member_self_signup(text, text, text, text, text);
 create or replace function member_self_signup(
   p_email text, p_password text, p_name text, p_company_code text, p_otp text
 )
@@ -2054,6 +2057,9 @@ end;
 $$;
 
 -- Re-defines get_my_profile to also return the wallet balance.
+-- (Return type is changing again, so drop the old one first — same reason
+-- as the member_self_signup fix above.)
+drop function if exists get_my_profile(uuid);
 create or replace function get_my_profile(p_token uuid)
 returns table(member_number int, member_name text, username text, email text, daily_amount numeric, wallet_balance numeric)
 language sql
@@ -2319,6 +2325,8 @@ $$;
 
 -- get_my_profile now also returns role + khata_eligible, so the client
 -- can branch into the HR panel and show the khata option at checkout.
+-- (Return type changes yet again — drop first, same reason as above.)
+drop function if exists get_my_profile(uuid);
 create or replace function get_my_profile(p_token uuid)
 returns table(member_number int, member_name text, username text, email text, daily_amount numeric,
               wallet_balance numeric, role text, khata_eligible boolean)
