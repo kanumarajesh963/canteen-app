@@ -1,28 +1,50 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail } from "lucide-react";
+import { Store, UserCircle2, Loader2, CheckCircle2, Copy, Building2, Mail, ArrowLeft } from "lucide-react";
 import {
   memberLoginGlobal, sellerLoginGlobal, sellerSignup, memberSignup, sendOtp,
-  storeAdminSession, storeMemberSession, rememberSession, hasAccountOnThisDevice, findActiveSession,
+  storeAdminSession, storeMemberSession, rememberSession, findActiveSession,
 } from "../lib/globalAuth";
 import { supabaseConfigured } from "../lib/supabaseClient";
 import PasswordInput from "../components/PasswordInput";
 
 // =========================================================================
-// The FIRST SCREEN of the app. All auth lives here:
-//   * Sign In (member or seller — one tab, role toggle)
-//   * Sign Up (choose Member or Seller → details → emailed OTP → account)
-//   * Forgot password (links to /forgot)
-// Returning users (this device has an account) see Sign In by default and
-// only a small "first time?" link. Still-logged-in visitors are bounced
-// straight to their home screen.
+// The FIRST SCREEN — kept as simple as a real app's login:
+//
+//   [ email    ]
+//   [ password ]        ← no role choice; we auto-detect member vs seller
+//   (  Sign in  )
+//   Forgot password? · New here? Create account
+//
+// "Create account" is the ONLY place you choose Member or Seller.
+// Demo accounts sign you in with one tap.
 // =========================================================================
+
+const DEMO_ACCOUNTS = [
+  { label: "Seller", sub: "runs the counter", email: "seller@demo.com", password: "demo123", Icon: Store },
+  { label: "Rahul", sub: "member", email: "rahul@demo.com", password: "demo123", Icon: UserCircle2 },
+  { label: "Priya", sub: "member", email: "priya@demo.com", password: "demo123", Icon: UserCircle2 },
+  { label: "Amit", sub: "member", email: "amit@demo.com", password: "demo123", Icon: UserCircle2 },
+  { label: "Sneha", sub: "member", email: "sneha@demo.com", password: "demo123", Icon: UserCircle2 },
+];
+export const DEMO_COMPANY_CODE = "DEMO99";
+
+// Sign in with just email + password — tries member first, then seller,
+// so nobody ever has to say which one they are. Returns { role, session }.
+async function smartLogin(email, password) {
+  const member = await memberLoginGlobal(email, password);
+  if (member) return { role: "member", session: member };
+  const seller = await sellerLoginGlobal(email, password);
+  if (seller) return { role: "seller", session: seller };
+  return null;
+}
+
 export default function AuthPage() {
   const navigate = useNavigate();
-  const returning = hasAccountOnThisDevice();
-  const [mode, setMode] = useState("signin"); // 'signin' | 'signup'
+  // 'signin' | 'choose' | 'signup-member' | 'signup-seller'
+  const [view, setView] = useState("signin");
 
-  // Already logged in? Go straight home — the auth page is for logged-out people.
+  // Already logged in? Skip this page entirely.
   useEffect(() => {
     const active = findActiveSession();
     if (active) {
@@ -35,41 +57,33 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-10">
       <div className="max-w-sm w-full">
-        <div className="text-center mb-6">
+        <div className="text-center mb-7">
           <div className="text-5xl mb-2">🍱</div>
           <h1 className="font-chalk text-3xl">The Canteen Counter</h1>
           <p className="text-steel text-sm">
-            {mode === "signin" ? "Sign in to your canteen." : "Create your account — verified by email."}
+            {view === "signin" && "Welcome back — sign in to continue."}
+            {view === "choose" && "Let's set you up. Who are you?"}
+            {view === "signup-member" && "Join your office canteen."}
+            {view === "signup-seller" && "Create and run your canteen."}
           </p>
         </div>
 
-        {/* Tabs — returning devices lead with Sign In only */}
-        <div className="flex bg-paper2 rounded-full p-1 mb-5">
-          <button
-            onClick={() => setMode("signin")}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-              mode === "signin" ? "bg-board text-paper shadow" : "text-steel hover:text-ink"
-            }`}
-          >
-            Sign In
-          </button>
-          <button
-            onClick={() => setMode("signup")}
-            className={`flex-1 py-2 rounded-full text-sm font-semibold transition ${
-              mode === "signup" ? "bg-board text-paper shadow" : "text-steel hover:text-ink"
-            }`}
-          >
-            Sign Up
-          </button>
-        </div>
+        {view === "signin" && <SignInView onCreateAccount={() => setView("choose")} />}
+        {view === "choose" && (
+          <ChooseRole
+            onMember={() => setView("signup-member")}
+            onSeller={() => setView("signup-seller")}
+            onBack={() => setView("signin")}
+          />
+        )}
+        {view === "signup-member" && <MemberSignupFlow onBack={() => setView("choose")} />}
+        {view === "signup-seller" && <SellerSignupFlow onBack={() => setView("choose")} />}
 
-        {mode === "signin" ? <SignInCard /> : <SignUpCard />}
-
-        {mode === "signin" && !returning && (
-          <p className="text-center text-xs text-steel mt-4">
-            First time here?{" "}
-            <button onClick={() => setMode("signup")} className="text-turmeric-dark font-semibold hover:underline">
-              Create an account
+        {view !== "signin" && (
+          <p className="text-center text-sm text-steel mt-5">
+            Already have an account?{" "}
+            <button onClick={() => setView("signin")} className="text-turmeric-dark font-semibold hover:underline">
+              Sign in
             </button>
           </p>
         )}
@@ -79,15 +93,27 @@ export default function AuthPage() {
 }
 
 // -------------------------------------------------------------------------
-// SIGN IN — one form, member/seller toggle. Backend finds the company.
+// SIGN IN — one form for everyone. Role is auto-detected.
 // -------------------------------------------------------------------------
-function SignInCard() {
-  const [role, setRole] = useState("member");
+function SignInView({ onCreateAccount }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [demoBusy, setDemoBusy] = useState(null); // email of the demo being signed in
   const navigate = useNavigate();
+
+  const finishLogin = ({ role, session }) => {
+    if (role === "member") {
+      storeMemberSession(session);
+      rememberSession("member", session.company_slug);
+      navigate(`/${session.company_slug}/member`);
+    } else {
+      storeAdminSession(session);
+      rememberSession("seller", session.company_slug);
+      navigate(`/${session.company_slug}/admin`);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -95,94 +121,133 @@ function SignInCard() {
     if (!email.trim() || !password) return setError("Email and password are both required.");
     setSubmitting(true);
     setError("");
+    const result = await smartLogin(email.trim(), password);
+    setSubmitting(false);
+    if (!result) return setError("Wrong email or password.");
+    finishLogin(result);
+  };
 
-    if (role === "member") {
-      const session = await memberLoginGlobal(email.trim(), password);
-      setSubmitting(false);
-      if (!session) return setError("Wrong email or password.");
-      storeMemberSession(session);
-      rememberSession("member", session.company_slug);
-      navigate(`/${session.company_slug}/member`);
-    } else {
-      const session = await sellerLoginGlobal(email.trim(), password);
-      setSubmitting(false);
-      if (!session) return setError("Wrong email or password.");
-      storeAdminSession(session);
-      rememberSession("seller", session.company_slug);
-      navigate(`/${session.company_slug}/admin`);
-    }
+  const signInAsDemo = async (acc) => {
+    if (!supabaseConfigured) return setError("Backend not connected — the site owner must set the Supabase env vars.");
+    setDemoBusy(acc.email);
+    setError("");
+    const result = await smartLogin(acc.email, acc.password);
+    setDemoBusy(null);
+    if (!result) return setError("Demo accounts aren't set up yet — run the latest schema.sql in Supabase.");
+    finishLogin(result);
   };
 
   return (
-    <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <RoleToggle role={role} setRole={setRole} />
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Email</label>
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
-          placeholder="you@gmail.com"
-          autoFocus
-          required
-        />
-      </div>
-      <div>
-        <label className="text-xs font-mono uppercase text-steel">Password</label>
-        <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
-        <div className="text-right mt-1">
-          <Link to="/forgot" className="text-xs text-turmeric-dark font-medium hover:underline">
+    <>
+      <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+        <div>
+          <label className="text-xs font-mono uppercase text-steel">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full px-4 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none"
+            placeholder="you@gmail.com"
+            autoFocus
+            required
+          />
+        </div>
+        <div>
+          <label className="text-xs font-mono uppercase text-steel">Password</label>
+          <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} required />
+        </div>
+        {error && <p className="text-brick text-sm">{error}</p>}
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
+        >
+          {submitting && <Loader2 size={16} className="animate-spin" />}
+          Sign in
+        </button>
+        <div className="flex items-center justify-between text-xs">
+          <Link to="/forgot" className="text-turmeric-dark font-medium hover:underline">
             Forgot password?
           </Link>
+          <button type="button" onClick={onCreateAccount} className="text-turmeric-dark font-semibold hover:underline">
+            New here? Create account
+          </button>
+        </div>
+      </form>
+
+      {/* Demo: one tap signs you straight in */}
+      <div className="mt-5">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex-1 h-px bg-ink/10" />
+          <span className="text-[11px] font-mono uppercase tracking-widest text-steel">or try the demo</span>
+          <div className="flex-1 h-px bg-ink/10" />
+        </div>
+        <div className="flex flex-wrap justify-center gap-2">
+          {DEMO_ACCOUNTS.map((acc) => (
+            <button
+              key={acc.email}
+              onClick={() => signInAsDemo(acc)}
+              disabled={demoBusy !== null}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-ink/15 bg-white text-sm font-medium hover:border-turmeric hover:bg-turmeric/5 disabled:opacity-50 transition"
+              title={`${acc.email} · ${acc.password}`}
+            >
+              {demoBusy === acc.email ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <acc.Icon size={14} className={acc.sub === "member" ? "text-sage" : "text-turmeric-dark"} />
+              )}
+              {acc.label}
+              <span className="text-[10px] text-steel font-normal">· {acc.sub}</span>
+            </button>
+          ))}
         </div>
       </div>
-      {error && <p className="text-brick text-sm">{error}</p>}
-      <button
-        type="submit"
-        disabled={submitting}
-        className="w-full bg-turmeric hover:bg-turmeric-dark disabled:opacity-60 text-ink font-semibold py-3 rounded-full transition flex items-center justify-center gap-2"
-      >
-        {submitting && <Loader2 size={16} className="animate-spin" />}
-        Sign in
-      </button>
-    </form>
+    </>
   );
 }
 
 // -------------------------------------------------------------------------
-// SIGN UP — choose Member or Seller → details → OTP (always) → account.
+// CREATE ACCOUNT — the only place you choose Member or Seller.
 // -------------------------------------------------------------------------
-function SignUpCard() {
-  const [role, setRole] = useState(null); // null → still choosing
-  if (!role) {
-    return (
-      <div className="bg-white rounded-2xl border border-ink/5 p-5">
-        <p className="text-sm text-steel text-center mb-4">Who are you signing up as?</p>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setRole("member")}
-            className="flex flex-col items-center gap-2 border border-ink/10 hover:border-turmeric rounded-2xl py-6 transition"
-          >
-            <UserCircle2 size={24} className="text-turmeric-dark" />
-            <span className="text-sm font-semibold">Member</span>
-            <span className="text-[11px] text-steel px-2 text-center">Join your office canteen with its company code</span>
-          </button>
-          <button
-            onClick={() => setRole("seller")}
-            className="flex flex-col items-center gap-2 border border-ink/10 hover:border-turmeric rounded-2xl py-6 transition"
-          >
-            <Store size={24} className="text-turmeric-dark" />
-            <span className="text-sm font-semibold">Seller</span>
-            <span className="text-[11px] text-steel px-2 text-center">Create a new canteen and run its counter</span>
-          </button>
-        </div>
+function ChooseRole({ onMember, onSeller, onBack }) {
+  return (
+    <div className="bg-white rounded-2xl border border-ink/5 p-5">
+      <button onClick={onBack} className="flex items-center gap-1 text-xs text-steel hover:text-ink mb-4">
+        <ArrowLeft size={13} /> Back
+      </button>
+      <div className="space-y-3">
+        <button
+          onClick={onMember}
+          className="w-full flex items-center gap-4 border border-ink/10 hover:border-turmeric rounded-2xl p-4 transition text-left"
+        >
+          <div className="w-11 h-11 rounded-xl bg-sage/10 text-sage flex items-center justify-center shrink-0">
+            <UserCircle2 size={22} />
+          </div>
+          <div>
+            <p className="font-semibold">I'm a member</p>
+            <p className="text-xs text-steel">I eat at my office canteen — I have its company code</p>
+          </div>
+        </button>
+        <button
+          onClick={onSeller}
+          className="w-full flex items-center gap-4 border border-ink/10 hover:border-turmeric rounded-2xl p-4 transition text-left"
+        >
+          <div className="w-11 h-11 rounded-xl bg-turmeric/15 text-turmeric-dark flex items-center justify-center shrink-0">
+            <Store size={22} />
+          </div>
+          <div>
+            <p className="font-semibold">I run a canteen</p>
+            <p className="text-xs text-steel">Create a new canteen and manage its counter</p>
+          </div>
+        </button>
       </div>
-    );
-  }
-  return role === "member" ? <MemberSignupFlow onBack={() => setRole(null)} /> : <SellerSignupFlow onBack={() => setRole(null)} />;
+    </div>
+  );
 }
 
+// -------------------------------------------------------------------------
+// MEMBER: Create account — details → emailed OTP → account + session.
+// -------------------------------------------------------------------------
 function MemberSignupFlow({ onBack }) {
   const [step, setStep] = useState(1); // 1 details → 2 otp
   const [name, setName] = useState("");
@@ -232,13 +297,18 @@ function MemberSignupFlow({ onBack }) {
         onSubmit={finish}
         onResend={() => sendOtp(email.trim())}
         submitLabel="Verify & create account"
+        onBack={() => {
+          setStep(1);
+          setOtp("");
+          setError("");
+        }}
       />
     );
   }
 
   return (
     <form onSubmit={begin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <BackRow onBack={onBack} icon={UserCircle2} title="Member signup" />
+      <TitleRow icon={UserCircle2} title="Create your member account" onBack={onBack} />
       <div>
         <label className="text-xs font-mono uppercase text-steel">Your name</label>
         <input
@@ -258,7 +328,7 @@ function MemberSignupFlow({ onBack }) {
           placeholder="ABC123"
           required
         />
-        <p className="text-[11px] text-steel mt-1">Your canteen seller shares this 6-character code.</p>
+        <p className="text-[11px] text-steel mt-1">Your canteen seller shares this 6-character code. (Demo: {DEMO_COMPANY_CODE})</p>
       </div>
       <div>
         <label className="text-xs font-mono uppercase text-steel">Email</label>
@@ -292,6 +362,9 @@ function MemberSignupFlow({ onBack }) {
   );
 }
 
+// -------------------------------------------------------------------------
+// SELLER: Create account — details → emailed OTP → company + code shown.
+// -------------------------------------------------------------------------
 function SellerSignupFlow({ onBack }) {
   const [step, setStep] = useState(1); // 1 details → 2 otp → 3 created
   const [companyName, setCompanyName] = useState("");
@@ -371,13 +444,18 @@ function SellerSignupFlow({ onBack }) {
         onSubmit={finish}
         onResend={() => sendOtp(email.trim())}
         submitLabel="Verify & create company"
+        onBack={() => {
+          setStep(1);
+          setOtp("");
+          setError("");
+        }}
       />
     );
   }
 
   return (
     <form onSubmit={begin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
-      <BackRow onBack={onBack} icon={Building2} title="Seller signup" />
+      <TitleRow icon={Building2} title="Create your canteen" onBack={onBack} />
       <div>
         <label className="text-xs font-mono uppercase text-steel">Company name</label>
         <input
@@ -424,42 +502,20 @@ function SellerSignupFlow({ onBack }) {
 // -------------------------------------------------------------------------
 // Shared bits
 // -------------------------------------------------------------------------
-function RoleToggle({ role, setRole }) {
+function TitleRow({ icon: Icon, title, onBack }) {
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {[
-        { id: "member", label: "Member", Icon: UserCircle2 },
-        { id: "seller", label: "Seller", Icon: Store },
-      ].map(({ id, label, Icon }) => (
-        <button
-          key={id}
-          type="button"
-          onClick={() => setRole(id)}
-          className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition ${
-            role === id ? "border-turmeric bg-turmeric/10 text-ink" : "border-ink/10 text-steel hover:border-ink/25"
-          }`}
-        >
-          <Icon size={16} /> {label}
+    <div className="flex items-center gap-2 text-sm font-semibold text-turmeric-dark -mt-1">
+      {onBack && (
+        <button type="button" onClick={onBack} className="text-steel hover:text-ink" title="Back">
+          <ArrowLeft size={15} />
         </button>
-      ))}
+      )}
+      <Icon size={15} /> {title}
     </div>
   );
 }
 
-function BackRow({ onBack, icon: Icon, title }) {
-  return (
-    <div className="flex items-center gap-2 -mt-1">
-      <button type="button" onClick={onBack} className="text-xs text-steel hover:text-ink hover:underline">
-        ← Back
-      </button>
-      <span className="flex items-center gap-1.5 text-sm font-semibold ml-auto text-turmeric-dark">
-        <Icon size={15} /> {title}
-      </span>
-    </div>
-  );
-}
-
-function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, submitLabel }) {
+function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, submitLabel, onBack }) {
   const [resent, setResent] = useState(false);
   return (
     <form onSubmit={onSubmit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
@@ -487,17 +543,22 @@ function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, su
         {submitting && <Loader2 size={16} className="animate-spin" />}
         {submitLabel}
       </button>
-      <button
-        type="button"
-        onClick={() => {
-          onResend();
-          setResent(true);
-          setTimeout(() => setResent(false), 2000);
-        }}
-        className="w-full text-xs text-turmeric-dark font-medium hover:underline"
-      >
-        {resent ? "Code re-sent ✅" : "Resend code"}
-      </button>
+      <div className="flex items-center justify-between">
+        <button type="button" onClick={onBack} className="text-xs text-steel hover:underline">
+          ← Edit details
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onResend();
+            setResent(true);
+            setTimeout(() => setResent(false), 2000);
+          }}
+          className="text-xs text-turmeric-dark font-medium hover:underline"
+        >
+          {resent ? "Code re-sent ✅" : "Resend code"}
+        </button>
+      </div>
     </form>
   );
 }

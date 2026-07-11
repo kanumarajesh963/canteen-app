@@ -1906,3 +1906,48 @@ as $$
     where token = p_token and expires_at > now()
   );
 $$;
+
+-- =========================================================================
+-- v9 add-on: demo accounts shown on the login screen.
+-- =========================================================================
+-- Creates/refreshes a Demo Canteen with 1 seller + 4 members, all with the
+-- password demo123, company code DEMO99. Safe to re-run any time.
+-- Remove the demo before/after your real launch with:
+--   delete from companies where slug = 'demo';
+-- =========================================================================
+
+do $$
+declare
+  v_company_id uuid;
+begin
+  select id into v_company_id from companies where slug = 'demo';
+  if v_company_id is null then
+    insert into companies (slug, name, emoji, admin_password_hash)
+    values ('demo', 'Demo Canteen', '🍱', crypt('demo123', gen_salt('bf')))
+    returning id into v_company_id;
+  end if;
+
+  -- Demo seller login + password (guarded so unique constraints can't break a re-run)
+  update companies set admin_password_hash = crypt('demo123', gen_salt('bf')), name = 'Demo Canteen'
+  where id = v_company_id;
+  update companies set seller_username = 'seller@demo.com'
+  where id = v_company_id
+    and not exists (select 1 from companies where seller_username = 'seller@demo.com' and id <> v_company_id);
+  update companies set company_code = 'DEMO99'
+  where id = v_company_id
+    and company_code is distinct from 'DEMO99'
+    and not exists (select 1 from companies where company_code = 'DEMO99' and id <> v_company_id);
+  update companies set company_code = _generate_company_code()
+  where id = v_company_id and company_code is null;
+
+  -- 4 demo members (high member numbers so they never collide with real ones)
+  insert into members (company_id, member_number, name, username, email, password_hash, daily_amount, active)
+  values
+    (v_company_id, 9001, 'Rahul Verma',  'rahul@demo.com', 'rahul@demo.com', crypt('demo123', gen_salt('bf')), 250, true),
+    (v_company_id, 9002, 'Priya Sharma', 'priya@demo.com', 'priya@demo.com', crypt('demo123', gen_salt('bf')), 250, true),
+    (v_company_id, 9003, 'Amit Patel',   'amit@demo.com',  'amit@demo.com',  crypt('demo123', gen_salt('bf')), 250, true),
+    (v_company_id, 9004, 'Sneha Reddy',  'sneha@demo.com', 'sneha@demo.com', crypt('demo123', gen_salt('bf')), 250, true)
+  on conflict (company_id, username) do update
+    set password_hash = excluded.password_hash, active = true,
+        name = excluded.name, email = excluded.email;
+end $$;
