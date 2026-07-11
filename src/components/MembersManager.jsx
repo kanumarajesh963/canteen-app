@@ -126,12 +126,12 @@ function MemberModal({ initial, onClose, onSave }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
-        <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 bg-ink/40 flex items-start sm:items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5 my-8 sm:my-0 max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between mb-4 sticky -top-5 -mt-5 pt-5 pb-2 bg-surface z-10">
           <h3 className="font-chalk text-xl">{initial ? "Edit member" : "Add member"}</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
-            <X size={18} />
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-paper2">
+            <X size={20} />
           </button>
         </div>
         <form onSubmit={submit} className="space-y-3">

@@ -2577,7 +2577,7 @@ $$;
 -- member_login_v2 now also mints a real admin_sessions token when the
 -- member's role is 'fullaccess', and returns their role. Return type
 -- changed, so drop first (same reason as every other v-bump in schema.sql).
-drop function if exists member_login_v2(text, text);
+drop function if exists member_login_v2(text, text) cascade;
 create or replace function member_login_v2(p_email text, p_password text)
 returns table(token uuid, member_id uuid, member_number int, member_name text,
               company_slug text, company_name text, role text, admin_token uuid)
@@ -2706,3 +2706,30 @@ $$;
 
 revoke execute on function khata_digest_rows(text) from public, anon, authenticated;
 grant execute on function khata_digest_rows(text) to service_role;
+
+-- =========================================================================
+-- v12 — HR can promote a plain member to HR (role only, not fullaccess),
+-- inline from the roster — no separate save step, same as the khata toggle.
+-- Deliberately one-directional and narrow: only touches role='member' rows,
+-- and only ever sets 'member' or 'hr' — HR can never grant itself or
+-- anyone else fullaccess, and can't touch a row that's already 'hr'
+-- (matches the existing "HR can't manage other HR" rule everywhere else).
+-- =========================================================================
+create or replace function hr_set_member_role(p_token uuid, p_member_id uuid, p_role text)
+returns void
+language plpgsql
+security definer
+as $$
+declare
+  v_company_id uuid := _hr_company(p_token);
+  v_role text := lower(trim(p_role));
+begin
+  if v_company_id is null then raise exception 'Not authorized'; end if;
+  if v_role not in ('member', 'hr') then
+    raise exception 'HR can only set role to member or hr';
+  end if;
+  update members set role = v_role
+  where id = p_member_id and company_id = v_company_id and role = 'member';
+  if not found then raise exception 'Member not found'; end if;
+end;
+$$;

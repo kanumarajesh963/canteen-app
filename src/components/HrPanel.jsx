@@ -10,7 +10,7 @@ import PasswordInput from "./PasswordInput";
 // resets — all scoped to plain 'member' targets only. HR cannot see or
 // touch the seller account or anything admin_* controls beyond this.
 export default function HrPanel() {
-  const { hrListMembers, hrLoginStats, hrSetKhataEligible, hrSetMemberActive } = useStore();
+  const { hrListMembers, hrLoginStats, hrSetKhataEligible, hrSetMemberActive, hrSetMemberRole } = useStore();
   const [members, setMembers] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -40,6 +40,14 @@ export default function HrPanel() {
     const res = await hrSetMemberActive(m.id, !m.active);
     setBusyId(null);
     if (!res.ok) return alert(res.error || "Couldn't update this member.");
+    refresh();
+  };
+
+  const changeRole = async (m, role) => {
+    setBusyId(m.id);
+    const res = await hrSetMemberRole(m.id, role);
+    setBusyId(null);
+    if (!res.ok) return alert(res.error || "Couldn't update role.");
     refresh();
   };
 
@@ -89,6 +97,7 @@ export default function HrPanel() {
                   <tr className="text-left text-[11px] font-mono uppercase text-steel border-b border-ink/10">
                     <th className="py-2 px-1">Member</th>
                     <th className="py-2 px-1">Last login</th>
+                    <th className="py-2 px-1">Role</th>
                     <th className="py-2 px-1">Khata</th>
                     <th className="py-2 px-1 text-right">Actions</th>
                   </tr>
@@ -111,6 +120,21 @@ export default function HrPanel() {
                           <p className="text-xs text-steel font-mono">{m.email}</p>
                         </td>
                         <td className="py-2 px-1 text-steel font-mono text-xs">{formatLastLogin(m.last_login)}</td>
+                        <td className="py-2 px-1">
+                          {managed ? (
+                            <select
+                              value={m.role}
+                              onChange={(e) => changeRole(m, e.target.value)}
+                              disabled={busyId === m.id}
+                              className="text-xs font-mono border border-ink/15 rounded-lg px-1.5 py-0.5 bg-surface disabled:opacity-50"
+                            >
+                              <option value="member">Member</option>
+                              <option value="hr">HR</option>
+                            </select>
+                          ) : (
+                            <span className="text-[11px] text-steel">HR</span>
+                          )}
+                        </td>
                         <td className="py-2 px-1">
                           {managed ? (
                             <button
@@ -188,12 +212,12 @@ function ResetPasswordModal({ member, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
+    <div className="fixed inset-0 bg-ink/40 flex items-start sm:items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5 my-8 sm:my-0 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">Reset password</h3>
-          <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
-            <X size={18} />
+          <button type="button" onClick={onClose} className="p-1.5 rounded-lg hover:bg-paper2">
+            <X size={20} />
           </button>
         </div>
         {done ? (

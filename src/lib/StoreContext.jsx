@@ -684,6 +684,19 @@ export function StoreProvider({ companySlug, children }) {
     [memberToken]
   );
 
+  const hrSetMemberRole = useCallback(
+    async (memberId, role) => {
+      const { error } = await supabase.rpc("hr_set_member_role", {
+        p_token: memberToken,
+        p_member_id: memberId,
+        p_role: role,
+      });
+      if (error) return { ok: false, error: error.message };
+      return { ok: true };
+    },
+    [memberToken]
+  );
+
   // ---------- seller: khata (credit tab) ----------
   const khataSummary = useCallback(async () => {
     if (!adminToken) return [];
@@ -848,6 +861,7 @@ export function StoreProvider({ companySlug, children }) {
       hrLoginStats,
       hrSetKhataEligible,
       hrSetMemberActive,
+      hrSetMemberRole,
     }),
     [
       loading, notFound, company, products, orders, myOrders, cart, isAdmin, customerId, customerPhone,
@@ -860,7 +874,7 @@ export function StoreProvider({ companySlug, children }) {
       listMyTickets, listTickets, setTicketStatus, replyTicket, requestPasswordOtp, resetPasswordWithOtp,
       loginStats, allCompanyLoginCounts, memberLoginDetails, khataSummary, khataEntriesFor, addKhataEntry, settleKhata, myKhata,
       memberProfile, placeOrderKhata, hrListMembers, hrResetMemberPassword, hrAttendance, hrLoginStats,
-      hrSetKhataEligible, hrSetMemberActive,
+      hrSetKhataEligible, hrSetMemberActive, hrSetMemberRole,
     ]
   );
 
