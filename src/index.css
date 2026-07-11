@@ -2,13 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Theme tokens -----------------------------------------------------
+   Every Tailwind color in tailwind.config.js (board, paper, ink, turmeric,
+   brick, steel, sage, surface) is wired to one of these CSS variables via
+   rgb(var(--color-x) / <alpha-value>). Flipping the variables below (light
+   in :root, dark in html.dark) makes every existing bg-, text-, and
+   border- color class in the app repaint automatically, with no
+   per-component dark mode classes needed. */
+:root {
+  --color-board: 38 42 59;
+  --color-board-light: 52 58 82;
+  --color-board-dark: 26 29 42;
+  --color-paper: 246 241 228;
+  --color-paper2: 239 231 210;
+  --color-ink: 43 38 32;
+  --color-turmeric: 232 169 59;
+  --color-turmeric-dark: 201 142 36;
+  --color-turmeric-light: 243 200 118;
+  --color-brick: 192 71 42;
+  --color-brick-dark: 154 54 32;
+  --color-steel: 131 128 122;
+  --color-sage: 61 110 165;
+  --color-surface: 255 255 255;
+
+  /* Non-Tailwind-token helpers used directly (charts, autofill, etc.) */
+  --chart-grid: rgba(43, 38, 32, 0.08);
+  --chart-tooltip-bg: #ffffff;
+  color-scheme: light;
+}
+
+html.dark {
+  --color-board: 52 58 82;
+  --color-board-light: 69 76 108;
+  --color-board-dark: 20 22 32;
+  --color-paper: 26 29 42;
+  --color-paper2: 38 42 59;
+  --color-ink: 240 237 228;
+  --color-turmeric: 240 180 84;
+  --color-turmeric-dark: 216 155 58;
+  --color-turmeric-light: 247 212 143;
+  --color-brick: 214 91 61;
+  --color-brick-dark: 177 68 40;
+  --color-steel: 156 153 146;
+  --color-sage: 91 138 196;
+  --color-surface: 44 49 68;
+
+  --chart-grid: rgba(240, 237, 228, 0.12);
+  --chart-tooltip-bg: #2c3144;
+  color-scheme: dark;
+}
+
 * { -webkit-tap-highlight-color: transparent; }
 
 html, body, #root { height: 100%; }
 
+html { transition: background-color 0.2s ease; }
+
 body {
   font-family: 'Poppins', sans-serif;
+  background-color: rgb(var(--color-paper));
+  color: rgb(var(--color-ink));
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
+
+/* iOS Safari paints autofilled inputs with its own blue background/text,
+   ignoring bg-surface/bg-paper — force it to keep using our theme colors
+   (background-color alone gets overridden live by the browser, so we lean
+   on a very long transition-delay trick plus -webkit-text-fill-color). */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-text-fill-color: rgb(var(--color-ink)) !important;
+  caret-color: rgb(var(--color-ink));
+  box-shadow: 0 0 0 1000px rgb(var(--color-surface)) inset !important;
+  transition: background-color 9999s ease-in-out 0s, color 9999s ease-in-out 0s;
+}
+
 
 /* Charts (recharts) render SVG text that doesn't inherit the body font —
    force the same font everywhere so the whole app looks consistent. */
@@ -17,8 +87,7 @@ svg text,
 .recharts-cartesian-axis-tick text,
 .recharts-legend-item-text {
   font-family: 'Poppins', sans-serif !important;
-  background-color: #F6F1E4;
-  color: #2B2620;
+  fill: rgb(var(--color-ink));
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -31,7 +100,7 @@ svg text,
 
 @layer utilities {
   .perforated {
-    background-image: radial-gradient(circle, #F6F1E4 3px, transparent 3.5px);
+    background-image: radial-gradient(circle, rgb(var(--color-paper)) 3px, transparent 3.5px);
     background-size: 14px 14px;
     background-position: 0 0;
   }
@@ -40,7 +109,7 @@ svg text,
 }
 
 :focus-visible {
-  outline: 2px solid #E8A93B;
+  outline: 2px solid rgb(var(--color-turmeric));
   outline-offset: 2px;
 }
 
@@ -72,7 +141,7 @@ button {
 .skeleton {
   position: relative;
   overflow: hidden;
-  background: #EFE7D2;
+  background: rgb(var(--color-paper2));
   border-radius: 0.75rem;
 }
 .skeleton::after {

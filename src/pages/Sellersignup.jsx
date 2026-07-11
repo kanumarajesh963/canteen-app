@@ -81,7 +81,7 @@ export default function SellerSignup() {
         </div>
 
         {created ? (
-          <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center">
+          <div className="bg-surface rounded-2xl border border-ink/5 p-6 text-center">
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">{created.company_name} is ready 🎉</p>
             <p className="text-steel text-sm mb-4">Share this company code — your members join with it:</p>
@@ -106,7 +106,7 @@ export default function SellerSignup() {
               e.preventDefault();
               finish(otpCode.trim());
             }}
-            className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4"
+            className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4"
           >
             <p className="text-sm text-steel">
               We mailed a 6-digit code to <b>{email.trim()}</b>. Enter it to finish:
@@ -137,7 +137,7 @@ export default function SellerSignup() {
             </button>
           </form>
         ) : (
-          <form onSubmit={begin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+          <form onSubmit={begin} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
             <div>
               <label className="text-xs font-mono uppercase text-steel">Company name (required)</label>
               <input

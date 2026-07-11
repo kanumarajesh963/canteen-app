@@ -16,7 +16,7 @@ export default function ItemCard({ product }) {
 
   return (
     <div
-      className={`relative bg-white rounded-2xl border-2 p-4 flex flex-col gap-3 transition-all duration-200 ${
+      className={`relative bg-surface rounded-2xl border-2 p-4 flex flex-col gap-3 transition-all duration-200 ${
         bumped ? "scale-[1.03] border-turmeric shadow-lg shadow-turmeric/10" : ""
       } ${outOfStock ? "border-steel/20 opacity-60" : "border-ink/5 hover:border-turmeric hover:-translate-y-0.5"}`}
     >
@@ -46,7 +46,7 @@ export default function ItemCard({ product }) {
           <div className="flex items-center gap-2 bg-paper2 rounded-full px-1 py-1">
             <button
               onClick={() => setCartQty(product.id, inCart - 1)}
-              className="w-7 h-7 rounded-full bg-white border border-ink/10 flex items-center justify-center hover:bg-brick hover:text-white transition"
+              className="w-7 h-7 rounded-full bg-surface border border-ink/10 flex items-center justify-center hover:bg-brick hover:text-white transition"
               aria-label={`Remove one ${product.name}`}
             >
               <Minus size={14} />
@@ -55,7 +55,7 @@ export default function ItemCard({ product }) {
             <button
               onClick={() => inCart < product.stock && setCartQty(product.id, inCart + 1)}
               disabled={inCart >= product.stock}
-              className="w-7 h-7 rounded-full bg-white border border-ink/10 flex items-center justify-center hover:bg-sage hover:text-white transition disabled:opacity-30"
+              className="w-7 h-7 rounded-full bg-surface border border-ink/10 flex items-center justify-center hover:bg-sage hover:text-white transition disabled:opacity-30"
               aria-label={`Add one more ${product.name}`}
             >
               <Plus size={14} />

@@ -9,6 +9,7 @@ import {
 } from "../lib/globalAuth";
 import { supabaseConfigured } from "../lib/supabaseClient";
 import PasswordInput from "../components/PasswordInput";
+import ThemeToggle from "../components/ThemeToggle";
 
 // =========================================================================
 // The FIRST SCREEN — laid out like a real mobile app's login:
@@ -76,9 +77,11 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-paper flex flex-col page-enter">
+      <ThemeToggle className="fixed top-4 right-4 z-40 bg-surface border border-ink/10 text-ink shadow-sm" />
+
       {/* ── Logo row — plain white, no dark band ─────────────────────── */}
       <div className="pt-8 pb-2 flex justify-center shrink-0">
-        <div className="bg-white border border-ink/10 rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-2 shadow-sm">
+        <div className="bg-surface border border-ink/10 rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-2 shadow-sm">
           <span className="w-8 h-8 rounded-full bg-turmeric flex items-center justify-center text-base">🍱</span>
           <span className="font-chalk text-lg text-ink leading-none">Corporate Canteen</span>
         </div>
@@ -203,7 +206,7 @@ function SignInView({ onCreateMember, onCreateSeller }) {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
             placeholder="Email Address"
             autoFocus
             required
@@ -264,7 +267,7 @@ function SignInView({ onCreateMember, onCreateSeller }) {
               key={acc.email}
               onClick={() => signInAsDemo(acc)}
               disabled={demoBusy !== null}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ink/15 bg-white text-xs font-medium hover:border-turmeric hover:bg-turmeric/5 disabled:opacity-50 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ink/15 bg-surface text-xs font-medium hover:border-turmeric hover:bg-turmeric/5 disabled:opacity-50 transition"
               title={`${acc.email} · ${acc.password}`}
             >
               {demoBusy === acc.email ? (
@@ -351,7 +354,7 @@ function MemberSignupFlow({ onBack }) {
         <input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
           placeholder="Your name"
           autoFocus
         />
@@ -362,7 +365,7 @@ function MemberSignupFlow({ onBack }) {
           <input
             value={companyCode}
             onChange={(e) => setCompanyCode(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 10))}
-            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white font-mono tracking-[0.25em]"
+            className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface font-mono tracking-[0.25em]"
             placeholder="Company code"
             required
           />
@@ -377,7 +380,7 @@ function MemberSignupFlow({ onBack }) {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
           placeholder="Email Address"
           required
         />
@@ -443,7 +446,7 @@ function SellerSignupFlow({ onBack }) {
 
   if (step === 3 && created) {
     return (
-      <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center shadow-sm">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-6 text-center shadow-sm">
         <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
         <p className="font-semibold mb-1">{created.company_name} is ready 🎉</p>
         <p className="text-steel text-sm mb-4">Share this company code — your members sign up with it:</p>
@@ -497,7 +500,7 @@ function SellerSignupFlow({ onBack }) {
         <input
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
           placeholder="Company name (e.g. Acme Corp Canteen)"
           autoFocus
           required
@@ -509,7 +512,7 @@ function SellerSignupFlow({ onBack }) {
           type="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+          className="w-full pl-10 pr-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
           placeholder="Email Address (your seller login)"
           required
         />
@@ -549,7 +552,7 @@ function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, su
   const [resent, setResent] = useState(false);
   return (
     <form onSubmit={onSubmit} className="space-y-4">
-      <div className="flex items-center gap-2 text-xs text-steel bg-white border border-ink/10 px-3 py-2.5 rounded-xl">
+      <div className="flex items-center gap-2 text-xs text-steel bg-surface border border-ink/10 px-3 py-2.5 rounded-xl">
         <Mail size={14} className="shrink-0" />
         <span>
           We mailed a 6-digit code to <b>{email}</b>. It expires in 10 minutes.
@@ -558,7 +561,7 @@ function OtpForm({ email, otp, setOtp, error, submitting, onSubmit, onResend, su
       <input
         value={otp}
         onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-        className="w-full px-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none text-center font-mono text-2xl tracking-[0.4em] bg-white"
+        className="w-full px-4 py-3 rounded-xl border border-ink/15 focus:border-turmeric outline-none text-center font-mono text-2xl tracking-[0.4em] bg-surface"
         placeholder="••••••"
         inputMode="numeric"
         autoFocus

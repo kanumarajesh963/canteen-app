@@ -148,7 +148,7 @@ export default function MemberHome() {
       <div className="grid grid-cols-2 gap-3 mb-6">
         <button
           onClick={() => setShowPassword(true)}
-          className="bg-white rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric transition text-left"
+          className="bg-surface rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric transition text-left"
         >
           <KeyRound size={18} className="text-turmeric-dark shrink-0" />
           <div>
@@ -158,7 +158,7 @@ export default function MemberHome() {
         </button>
         <button
           onClick={() => setShowTicket(true)}
-          className="bg-white rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric transition text-left"
+          className="bg-surface rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric transition text-left"
         >
           <LifeBuoy size={18} className="text-brick shrink-0" />
           <div>
@@ -168,7 +168,7 @@ export default function MemberHome() {
         </button>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <p className="text-sm font-semibold mb-3">Attendance history</p>
         {loading ? (
           <p className="text-steel text-sm text-center py-6">Loading…</p>
@@ -190,7 +190,7 @@ export default function MemberHome() {
       </div>
 
       {myTickets.length > 0 && (
-        <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 mt-6">
+        <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5 mt-6">
           <p className="text-sm font-semibold mb-3">My tickets</p>
           <div className="space-y-3">
             {myTickets.map((t) => (
@@ -257,7 +257,7 @@ function ChangePasswordModal({ onClose, changeMyPassword }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">Change password</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
@@ -326,7 +326,7 @@ function RaiseTicketModal({ onClose, raiseMyTicket, onSent }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">Raise a ticket</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">

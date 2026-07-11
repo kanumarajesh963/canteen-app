@@ -42,7 +42,7 @@ export default function MembersManager() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {members.map((m) => (
-            <div key={m.id} className={`bg-white rounded-2xl border p-4 ${m.active ? "border-ink/5" : "border-brick/30 opacity-60"}`}>
+            <div key={m.id} className={`bg-surface rounded-2xl border p-4 ${m.active ? "border-ink/5" : "border-brick/30 opacity-60"}`}>
               <div className="flex items-start justify-between">
                 <div>
                   <p className="font-semibold text-sm flex items-center gap-1.5">
@@ -124,7 +124,7 @@ function MemberModal({ initial, onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">{initial ? "Edit member" : "Add member"}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
@@ -188,7 +188,7 @@ function MemberModal({ initial, onClose, onSave }) {
             <select
               value={role}
               onChange={(e) => setRole(e.target.value)}
-              className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric bg-white"
+              className="mt-1 w-full px-3.5 py-2 rounded-xl border border-ink/15 outline-none focus:border-turmeric bg-surface"
             >
               <option value="member">Member</option>
               <option value="hr">HR — attendance/analytics view + password resets</option>

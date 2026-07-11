@@ -69,7 +69,7 @@ export default function Wallet() {
           <p className="text-steel text-sm">Recharge once, pay instantly at checkout — no app-picking required.</p>
         </div>
 
-        <form onSubmit={submitLogin} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+        <form onSubmit={submitLogin} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
           <div>
             <label className="text-xs font-mono uppercase text-steel">Phone number</label>
             <div className="mt-1 flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-ink/15 focus-within:border-turmeric">
@@ -130,7 +130,7 @@ export default function Wallet() {
         <p className="text-4xl font-bold font-mono mt-1">₹{walletBalance}</p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 mb-6">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5 mb-6">
         <p className="text-sm font-semibold mb-3">Recharge</p>
         <div className="grid grid-cols-4 gap-2 mb-3">
           {RECHARGE_PRESETS.map((p) => (
@@ -167,7 +167,7 @@ export default function Wallet() {
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <p className="text-sm font-semibold mb-3">Recent activity</p>
         {txns.length === 0 ? (
           <p className="text-steel text-sm text-center py-6">No transactions yet.</p>

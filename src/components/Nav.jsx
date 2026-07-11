@@ -3,6 +3,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { ShoppingBasket, LayoutDashboard, Receipt, Wallet, UserCircle2, LogOut, Loader2 } from "lucide-react";
 import { useStore } from "../lib/StoreContext";
 import { clearRememberedSession } from "../lib/globalAuth";
+import ThemeToggle from "./ThemeToggle";
 
 // Top bar. Auth-wise it shows ONE thing: Logout — same for members and
 // sellers. (You can only be here logged in; the shell redirects otherwise.)
@@ -96,6 +97,8 @@ export default function Nav({ onCartClick }) {
               Dashboard
             </NavLink>
           )}
+
+          <ThemeToggle className="text-paper/85 hover:text-paper" />
 
           <button
             onClick={onCartClick}

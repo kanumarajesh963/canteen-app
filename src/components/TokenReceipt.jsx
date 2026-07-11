@@ -8,7 +8,7 @@ export default function TokenReceipt({ order }) {
 
   return (
     <div className="max-w-sm mx-auto animate-token-reveal">
-      <div className="bg-white rounded-t-2xl shadow-xl overflow-hidden border border-ink/10 border-b-0">
+      <div className="bg-surface rounded-t-2xl shadow-xl overflow-hidden border border-ink/10 border-b-0">
         <div className="bg-board text-paper text-center py-4">
           <p className="font-mono text-[11px] tracking-[0.3em] uppercase text-turmeric-light">Token Number</p>
           <p className="font-mono text-5xl font-bold mt-1">#{String(order.token).padStart(3, "0")}</p>

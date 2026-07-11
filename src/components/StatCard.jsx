@@ -8,7 +8,7 @@ export default function StatCard({ label, value, sub, tone = "sage", icon: Icon 
     board: "text-board bg-board/10",
   };
   return (
-    <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 flex flex-col gap-2">
+    <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <span className="text-xs font-mono uppercase tracking-wide text-steel">{label}</span>
         {Icon && (

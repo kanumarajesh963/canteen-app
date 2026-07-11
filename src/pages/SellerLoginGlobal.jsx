@@ -47,7 +47,7 @@ export default function SellerLoginGlobal() {
           <p className="text-steel text-sm">Log in with your email and password.</p>
         </div>
 
-        <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+        <form onSubmit={submit} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
           <div>
             <label className="text-xs font-mono uppercase text-steel">Email</label>
             <input

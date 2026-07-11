@@ -82,7 +82,7 @@ export default function ForgotPassword() {
         </div>
 
         {step === 3 ? (
-          <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center">
+          <div className="bg-surface rounded-2xl border border-ink/5 p-6 text-center">
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Password reset ✅</p>
             <p className="text-steel text-sm">Taking you back to Sign In…</p>
@@ -94,7 +94,7 @@ export default function ForgotPassword() {
             </Link>
           </div>
         ) : step === 2 ? (
-          <form onSubmit={resetPassword} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+          <form onSubmit={resetPassword} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
             <div className="flex items-center gap-2 text-xs text-steel bg-paper2 px-3 py-2 rounded-xl">
               <Mail size={14} className="shrink-0" />
               <span>
@@ -143,7 +143,7 @@ export default function ForgotPassword() {
             </button>
           </form>
         ) : (
-          <form onSubmit={sendCode} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+          <form onSubmit={sendCode} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
             <div>
               <label className="text-xs font-mono uppercase text-steel">Your email (the one you log in with)</label>
               <input
@@ -234,7 +234,7 @@ export function ForgotPasswordAskSeller() {
         </div>
 
         {done ? (
-          <div className="bg-white rounded-2xl border border-ink/5 p-6 text-center">
+          <div className="bg-surface rounded-2xl border border-ink/5 p-6 text-center">
             <CheckCircle2 size={32} className="text-sage mx-auto mb-2" />
             <p className="font-semibold mb-1">Request sent ✅</p>
             <p className="text-steel text-sm">
@@ -248,7 +248,7 @@ export function ForgotPasswordAskSeller() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+          <form onSubmit={submit} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
             <div>
               <label className="text-xs font-mono uppercase text-steel">Your email (the one you log in with)</label>
               <input

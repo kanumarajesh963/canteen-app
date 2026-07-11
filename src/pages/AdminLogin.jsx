@@ -33,7 +33,7 @@ export default function AdminLogin() {
         <p className="text-steel text-sm">Manage stock, orders and today's sales for {company.name}.</p>
       </div>
 
-      <form onSubmit={submit} className="bg-white rounded-2xl border border-ink/5 p-5 space-y-4">
+      <form onSubmit={submit} className="bg-surface rounded-2xl border border-ink/5 p-5 space-y-4">
         <div>
           <label className="text-xs font-mono uppercase text-steel">Password</label>
           <PasswordInput className="mt-1" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter seller password" autoFocus />

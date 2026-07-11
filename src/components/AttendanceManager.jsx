@@ -73,7 +73,7 @@ export default function AttendanceManager() {
       )}
 
       {/* Mark attendance */}
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-3">Mark attendance</h3>
         <form onSubmit={submitAttendance} className="flex flex-wrap gap-3 items-end">
           <div>
@@ -125,7 +125,7 @@ export default function AttendanceManager() {
       </div>
 
       {/* Who's marked for this date */}
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-3">Roster for {date}</h3>
         {todayRoster.length === 0 ? (
           <p className="text-steel text-sm py-4 text-center">No members yet.</p>
@@ -147,7 +147,7 @@ export default function AttendanceManager() {
       </div>
 
       {/* Charts */}
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
           <h3 className="font-semibold">Collected vs profit</h3>
           <div className="flex gap-2">
@@ -170,10 +170,10 @@ export default function AttendanceManager() {
         </div>
         <ResponsiveContainer width="100%" height={280}>
           <BarChart data={chartData} margin={{ left: -20, right: 10 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2B262015" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis dataKey="label" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
             <YAxis tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
-            <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #2B262015", fontFamily: "IBM Plex Mono", fontSize: 12 }} />
+            <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--chart-grid)", fontFamily: "IBM Plex Mono", fontSize: 12, backgroundColor: "var(--chart-tooltip-bg)", color: "rgb(var(--color-ink))" }} />
             <Legend wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="collected" fill="#4C7A64" radius={[6, 6, 0, 0]} name="Collected" />
             <Bar dataKey="profit" fill="#E8A93B" radius={[6, 6, 0, 0]} name="Profit" />

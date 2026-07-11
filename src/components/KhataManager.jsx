@@ -53,12 +53,12 @@ export default function KhataManager() {
           <div className="skeleton h-14 w-full" />
         </div>
       ) : summary.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-ink/5 p-8 text-center">
+        <div className="bg-surface rounded-2xl border border-ink/5 p-8 text-center">
           <BookText size={28} className="text-steel mx-auto mb-2" />
           <p className="text-steel text-sm">No open khata entries. Everyone's settled up 🎉</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-ink/5 divide-y divide-ink/5">
+        <div className="bg-surface rounded-2xl border border-ink/5 divide-y divide-ink/5">
           {summary.map((row) => (
             <button
               key={row.member_id}
@@ -127,7 +127,7 @@ function AddKhataModal({ members, onClose, addKhataEntry, onSaved }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">Add to khata</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
@@ -150,7 +150,7 @@ function AddKhataModal({ members, onClose, addKhataEntry, onSaved }) {
               <select
                 value={memberId}
                 onChange={(e) => setMemberId(e.target.value)}
-                className="mt-1 w-full px-3.5 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white"
+                className="mt-1 w-full px-3.5 py-2.5 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface"
                 required
                 autoFocus
               >
@@ -239,7 +239,7 @@ function KhataDetailModal({ member, onClose, khataEntriesFor, settleKhata, onSet
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5 max-h-[85vh] overflow-y-auto">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5 max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-chalk text-xl">{member.member_name || `Member #${member.member_number}`}</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">

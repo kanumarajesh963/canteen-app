@@ -14,7 +14,7 @@ export default function PasswordInput({ value, onChange, placeholder = "Enter pa
         placeholder={placeholder}
         required={required}
         autoFocus={autoFocus}
-        className={`w-full py-2.5 pr-11 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-white ${Icon ? "pl-10" : "pl-4"}`}
+        className={`w-full py-2.5 pr-11 rounded-xl border border-ink/15 focus:border-turmeric outline-none bg-surface ${Icon ? "pl-10" : "pl-4"}`}
       />
       <button
         type="button"

@@ -51,7 +51,7 @@ export default function MyOrders() {
           <div
             key={o.id}
             style={{ animationDelay: `${i * 40}ms` }}
-            className="w-full text-left bg-white rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric hover:-translate-y-0.5 transition animate-fade-in-up cursor-pointer"
+            className="w-full text-left bg-surface rounded-2xl border border-ink/5 p-4 flex items-center gap-3 hover:border-turmeric hover:-translate-y-0.5 transition animate-fade-in-up cursor-pointer"
             onClick={() => setSelected(o)}
           >
             <div className="w-11 h-11 rounded-full bg-board text-turmeric-light flex items-center justify-center shrink-0">
@@ -91,7 +91,7 @@ export default function MyOrders() {
           <div className="relative animate-pop-in" onClick={(e) => e.stopPropagation()}>
             <button
               onClick={() => setSelected(null)}
-              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-white shadow-lg flex items-center justify-center z-10"
+              className="absolute -top-3 -right-3 w-9 h-9 rounded-full bg-surface shadow-lg flex items-center justify-center z-10"
               aria-label="Close receipt"
             >
               <X size={18} />

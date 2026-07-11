@@ -40,7 +40,7 @@ export default function CartDrawer({ open, onClose }) {
             </div>
           ) : (
             lines.map(({ product, qty }) => (
-              <div key={product.id} className="flex items-center gap-3 bg-white rounded-xl p-3 border border-ink/5">
+              <div key={product.id} className="flex items-center gap-3 bg-surface rounded-xl p-3 border border-ink/5">
                 <div className="text-2xl">{product.emoji}</div>
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-sm truncate">{product.name}</p>
@@ -68,7 +68,7 @@ export default function CartDrawer({ open, onClose }) {
         </div>
 
         {lines.length > 0 && (
-          <div className="border-t border-ink/10 p-5 space-y-3 bg-white">
+          <div className="border-t border-ink/10 p-5 space-y-3 bg-surface">
             <div className="flex items-center justify-between font-mono">
               <span className="text-steel">Total</span>
               <span className="text-xl font-bold text-sage">₹{total}</span>

@@ -1,28 +1,40 @@
 /** @type {import('tailwindcss').Config} */
+
+// Reads a CSS variable holding an "R G B" triplet (defined in src/index.css
+// for :root and html.dark) and wires it up so Tailwind's opacity modifiers
+// (e.g. bg-paper/50) keep working: rgb(var(--x) / <alpha-value>).
+function withCssVar(name) {
+  return `rgb(var(${name}) / <alpha-value>)`;
+}
+
 export default {
+  darkMode: "class",
   content: ["./index.html", "./src/**/*.{js,jsx}"],
   theme: {
     extend: {
       colors: {
         board: {
-          DEFAULT: "#262A3B",
-          light: "#343A52",
-          dark: "#1A1D2A",
+          DEFAULT: withCssVar("--color-board"),
+          light: withCssVar("--color-board-light"),
+          dark: withCssVar("--color-board-dark"),
         },
-        paper: "#F6F1E4",
-        paper2: "#EFE7D2",
-        ink: "#2B2620",
+        paper: withCssVar("--color-paper"),
+        paper2: withCssVar("--color-paper2"),
+        ink: withCssVar("--color-ink"),
         turmeric: {
-          DEFAULT: "#E8A93B",
-          dark: "#C98E24",
-          light: "#F3C876",
+          DEFAULT: withCssVar("--color-turmeric"),
+          dark: withCssVar("--color-turmeric-dark"),
+          light: withCssVar("--color-turmeric-light"),
         },
         brick: {
-          DEFAULT: "#C0472A",
-          dark: "#9A3620",
+          DEFAULT: withCssVar("--color-brick"),
+          dark: withCssVar("--color-brick-dark"),
         },
-        steel: "#83807A",
-        sage: "#3D6EA5",
+        steel: withCssVar("--color-steel"),
+        sage: withCssVar("--color-sage"),
+        // Replaces the old hardcoded bg-white surfaces (cards, inputs,
+        // circular buttons) so they flip to a dark card color in dark mode.
+        surface: withCssVar("--color-surface"),
       },
       fontFamily: {
         sans: ["'Poppins'", "sans-serif"],

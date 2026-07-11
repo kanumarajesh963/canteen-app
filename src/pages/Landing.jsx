@@ -25,14 +25,14 @@ export default function Landing() {
         <div className="grid grid-cols-2 gap-3 mb-6">
           <Link
             to="/member/login"
-            className="flex flex-col items-center gap-2 bg-white border border-ink/10 hover:border-turmeric rounded-2xl py-5 transition"
+            className="flex flex-col items-center gap-2 bg-surface border border-ink/10 hover:border-turmeric rounded-2xl py-5 transition"
           >
             <UserCircle2 size={22} className="text-turmeric-dark" />
             <span className="text-sm font-semibold">Member Login</span>
           </Link>
           <Link
             to="/seller/login"
-            className="flex flex-col items-center gap-2 bg-white border border-ink/10 hover:border-turmeric rounded-2xl py-5 transition"
+            className="flex flex-col items-center gap-2 bg-surface border border-ink/10 hover:border-turmeric rounded-2xl py-5 transition"
           >
             <Store size={22} className="text-turmeric-dark" />
             <span className="text-sm font-semibold">Seller Login</span>

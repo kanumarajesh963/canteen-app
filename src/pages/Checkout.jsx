@@ -69,7 +69,7 @@ export default function Checkout() {
       <h1 className="font-chalk text-3xl sm:text-4xl text-ink mb-1">Pay for your booking</h1>
       <p className="text-steel text-sm mb-6">Use your Canteen Wallet for instant checkout, any UPI app, or pay at the counter.</p>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 mb-6">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 mb-6">
         {lines.map((l) => (
           <div key={l.product.id} className="flex justify-between text-sm py-1.5">
             <span>{l.product.emoji} {l.product.name} × {l.qty}</span>
@@ -88,7 +88,7 @@ export default function Checkout() {
             key={app.id}
             onClick={() => setMethod(app.id)}
             className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 text-left transition ${
-              method === app.id ? "border-turmeric bg-turmeric/10" : "border-ink/10 hover:border-ink/25 bg-white"
+              method === app.id ? "border-turmeric bg-turmeric/10" : "border-ink/10 hover:border-ink/25 bg-surface"
             }`}
           >
             <span className="text-2xl">{app.emoji}</span>

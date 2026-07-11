@@ -44,7 +44,7 @@ export default function TicketsManager() {
           {[...open, ...resolved].map((t) => (
             <div
               key={t.id}
-              className={`bg-white rounded-2xl border p-4 ${
+              className={`bg-surface rounded-2xl border p-4 ${
                 t.status === "open"
                   ? t.type === "password_reset"
                     ? "border-turmeric/50"
@@ -155,7 +155,7 @@ function ReplyModal({ ticket, onClose, replyTicket, onSent }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-md w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-md w-full p-5">
         <div className="flex items-center justify-between mb-1">
           <h3 className="font-chalk text-xl">Reply to ticket</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">

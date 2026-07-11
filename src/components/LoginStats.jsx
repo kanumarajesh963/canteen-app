@@ -35,7 +35,7 @@ export default function LoginStats() {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-1">Logins per company</h3>
         <p className="text-xs text-steel mb-4">
           How many people logged in, for every company on this deployment (counts only).

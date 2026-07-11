@@ -26,7 +26,10 @@ import TicketsManager from "../components/TicketsManager";
 import LoginStats from "../components/LoginStats";
 import KhataManager from "../components/KhataManager";
 
-const PIE_COLORS = ["#3D6EA5", "#E8A93B", "#C0472A", "#262A3B", "#83807A", "#F3C876"];
+// Avoid #262A3B (the "board" navy) here — it nearly disappears against the
+// dark-mode card background. #4C7A64 (the revenue-chart green) stands out
+// in both themes instead.
+const PIE_COLORS = ["#3D6EA5", "#E8A93B", "#C0472A", "#4C7A64", "#83807A", "#F3C876"];
 const STATUS_FLOW = ["placed", "preparing", "ready", "picked_up"];
 const STATUS_LABEL = { placed: "Placed", preparing: "Preparing", ready: "Ready", picked_up: "Picked up" };
 
@@ -173,7 +176,7 @@ function Overview({ stats, daily, monthly, sellers, catData }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-3">Last 14 days — Revenue vs Profit</h3>
         <ResponsiveContainer width="100%" height={260}>
           <AreaChart data={daily} margin={{ left: -20, right: 10 }}>
@@ -187,11 +190,11 @@ function Overview({ stats, daily, monthly, sellers, catData }) {
                 <stop offset="100%" stopColor="#E8A93B" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#2B262015" />
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
             <XAxis dataKey="label" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
             <YAxis tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
             <Tooltip
-              contentStyle={{ borderRadius: 12, border: "1px solid #2B262015", fontFamily: "IBM Plex Mono", fontSize: 12 }}
+              contentStyle={{ borderRadius: 12, border: "1px solid var(--chart-grid)", fontFamily: "IBM Plex Mono", fontSize: 12, backgroundColor: "var(--chart-tooltip-bg)", color: "rgb(var(--color-ink))" }}
             />
             <Area type="monotone" dataKey="revenue" stroke="#4C7A64" fill="url(#rev)" strokeWidth={2} name="Revenue" />
             <Area type="monotone" dataKey="profit" stroke="#E8A93B" fill="url(#prof)" strokeWidth={2} name="Profit" />
@@ -200,20 +203,20 @@ function Overview({ stats, daily, monthly, sellers, catData }) {
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+        <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
           <h3 className="font-semibold mb-3">Monthly revenue ({new Date().getFullYear()})</h3>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={monthly} margin={{ left: -20, right: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2B262015" />
+              <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
               <XAxis dataKey="label" tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
               <YAxis tick={{ fontSize: 11, fontFamily: "IBM Plex Mono" }} />
-              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid #2B262015", fontFamily: "IBM Plex Mono", fontSize: 12 }} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: "1px solid var(--chart-grid)", fontFamily: "IBM Plex Mono", fontSize: 12, backgroundColor: "var(--chart-tooltip-bg)", color: "rgb(var(--color-ink))" }} />
               <Bar dataKey="revenue" fill="#1F3A2E" radius={[6, 6, 0, 0]} name="Revenue" />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+        <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
           <h3 className="font-semibold mb-3">Revenue by category</h3>
           {catData.length === 0 ? (
             <p className="text-steel text-sm py-10 text-center">No sales recorded yet.</p>
@@ -233,7 +236,7 @@ function Overview({ stats, daily, monthly, sellers, catData }) {
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5">
         <h3 className="font-semibold mb-3">Top sellers</h3>
         {sellers.length === 0 ? (
           <p className="text-steel text-sm py-6 text-center">No sales yet — top items will appear here.</p>
@@ -272,7 +275,7 @@ function Inventory({ products, setStock, onEdit, onDelete, onAdd }) {
         {products.map((p) => {
           const low = p.stock <= (p.low_stock_threshold ?? 5);
           return (
-            <div key={p.id} className={`bg-white rounded-2xl border p-4 ${low ? "border-brick/40" : "border-ink/5"}`}>
+            <div key={p.id} className={`bg-surface rounded-2xl border p-4 ${low ? "border-brick/40" : "border-ink/5"}`}>
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{p.emoji}</span>
@@ -329,7 +332,7 @@ function Inventory({ products, setStock, onEdit, onDelete, onAdd }) {
 
 function Orders({ orders, setOrderStatus }) {
   return (
-    <div className="bg-white rounded-2xl border border-ink/5 overflow-hidden">
+    <div className="bg-surface rounded-2xl border border-ink/5 overflow-hidden">
       {orders.length === 0 ? (
         <p className="text-steel text-sm py-12 text-center">No orders yet.</p>
       ) : (
@@ -418,7 +421,7 @@ function CounterSale({ products, placeOrder, canFulfill }) {
         Someone walked up to the shop and bought directly? Log it here — stock updates immediately for online buyers too.
       </p>
 
-      <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 space-y-3">
+      <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5 space-y-3">
         {products.map((p) => (
           <div key={p.id} className="flex items-center gap-3">
             <span className="text-xl">{p.emoji}</span>

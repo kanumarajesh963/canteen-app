@@ -39,7 +39,7 @@ export default function HrPanel() {
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-ink/5 p-4 sm:p-5 mb-6">
+    <div className="bg-surface rounded-2xl border border-ink/5 p-4 sm:p-5 mb-6">
       <div className="flex items-center justify-between mb-1">
         <h2 className="font-chalk text-xl">HR tools</h2>
         <span className="text-[10px] font-mono uppercase bg-sage/15 text-sage px-2 py-0.5 rounded-full">HR access</span>
@@ -128,7 +128,7 @@ function ResetPasswordModal({ member, onClose }) {
 
   return (
     <div className="fixed inset-0 bg-ink/40 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-2xl max-w-sm w-full p-5">
+      <div className="bg-surface rounded-2xl max-w-sm w-full p-5">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-chalk text-xl">Reset password</h3>
           <button onClick={onClose} className="p-1 rounded-lg hover:bg-paper2">
