@@ -1362,6 +1362,7 @@ $$;
 -- involved at CREATION time (seller adds the member). Safe to re-run.
 -- =========================================================================
 
+drop function if exists member_login_v2(text, text) cascade;
 create or replace function member_login_v2(p_email text, p_password text)
 returns table(token uuid, member_id uuid, member_number int, member_name text, company_slug text, company_name text)
 language plpgsql
@@ -2352,6 +2353,7 @@ $$;
 -- HR: list regular members in their company, with last-login computed
 -- from login_events. Deliberately excludes password_hash, and excludes
 -- other HR/seller accounts -- HR only ever sees/manages plain members.
+drop function if exists hr_list_members(uuid);
 create or replace function hr_list_members(p_token uuid)
 returns table(id uuid, member_number int, name text, email text, active boolean,
               daily_amount numeric, khata_eligible boolean, last_login timestamptz)
