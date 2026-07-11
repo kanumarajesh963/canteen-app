@@ -61,8 +61,8 @@ async function smartLogin(email, password, prefer = "member") {
 
 export default function AuthPage() {
   const navigate = useNavigate();
-  const [view, setView] = useState("signin"); // 'signin' | 'signup'
-  const [roleTab, setRoleTab] = useState("member"); // 'member' | 'seller' — the tabs under Welcome!
+  // 'signin' | 'signup-member' | 'signup-seller'
+  const [view, setView] = useState("signin");
 
   // Already logged in? Skip this page entirely.
   useEffect(() => {
@@ -76,50 +76,31 @@ export default function AuthPage() {
 
   return (
     <div className="min-h-screen bg-board bg-chalk-texture flex flex-col">
-      {/* ── Header band with logo pill ─────────────────────────────── */}
-      <div className="pt-12 pb-14 flex justify-center shrink-0">
-        <div className="bg-paper rounded-full pl-2 pr-6 py-2 flex items-center gap-2.5 shadow-lg">
-          <span className="w-10 h-10 rounded-full bg-board flex items-center justify-center text-xl">🍱</span>
-          <span className="font-chalk text-xl text-ink leading-none">The Canteen Counter</span>
+      {/* ── Header band with logo pill (kept short — no scrolling) ──── */}
+      <div className="pt-7 pb-10 flex justify-center shrink-0">
+        <div className="bg-paper rounded-full pl-1.5 pr-5 py-1.5 flex items-center gap-2 shadow-lg">
+          <span className="w-8 h-8 rounded-full bg-board flex items-center justify-center text-base">🍱</span>
+          <span className="font-chalk text-lg text-ink leading-none">The Canteen Counter</span>
         </div>
       </div>
 
       {/* ── White sheet ────────────────────────────────────────────── */}
-      <div className="flex-1 bg-paper rounded-t-[2.5rem] px-6 pt-10 pb-10 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
+      <div className="flex-1 bg-paper rounded-t-[2rem] px-6 pt-7 pb-8 shadow-[0_-8px_30px_rgba(0,0,0,0.25)]">
         <div className="max-w-sm mx-auto w-full">
-          <h2 className="text-center text-2xl font-bold mb-5">Welcome!</h2>
-
-          {/* Member | Seller tabs — right below Welcome! */}
-          <div className="flex bg-white border border-ink/10 rounded-full p-1 mb-5">
-            {[
-              { id: "member", label: "Member", Icon: UserCircle2 },
-              { id: "seller", label: "Seller", Icon: Store },
-            ].map(({ id, label, Icon }) => (
-              <button
-                key={id}
-                onClick={() => {
-                  setRoleTab(id);
-                  setView("signin");
-                }}
-                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-sm font-semibold transition ${
-                  roleTab === id ? "bg-board text-paper shadow" : "text-steel hover:text-ink"
-                }`}
-              >
-                <Icon size={15} /> {label}
-              </button>
-            ))}
-          </div>
-
-          {view === "signin" ? (
-            <SignInView role={roleTab} onCreateAccount={() => setView("signup")} />
-          ) : roleTab === "member" ? (
-            <MemberSignupFlow onBack={() => setView("signin")} />
-          ) : (
-            <SellerSignupFlow onBack={() => setView("signin")} />
+          {view === "signin" && (
+            <>
+              <h2 className="text-center text-2xl font-bold mb-5">Welcome!</h2>
+              <SignInView
+                onCreateMember={() => setView("signup-member")}
+                onCreateSeller={() => setView("signup-seller")}
+              />
+            </>
           )}
+          {view === "signup-member" && <MemberSignupFlow onBack={() => setView("signin")} />}
+          {view === "signup-seller" && <SellerSignupFlow onBack={() => setView("signin")} />}
 
-          {view === "signup" && (
-            <p className="text-center text-sm text-steel mt-6">
+          {view !== "signin" && (
+            <p className="text-center text-sm text-steel mt-5">
               Already have an account?{" "}
               <button onClick={() => setView("signin")} className="text-turmeric-dark font-semibold hover:underline">
                 Sign in
@@ -135,7 +116,7 @@ export default function AuthPage() {
 // -------------------------------------------------------------------------
 // SIGN IN — one form for everyone. Role is auto-detected.
 // -------------------------------------------------------------------------
-function SignInView({ role, onCreateAccount }) {
+function SignInView({ onCreateMember, onCreateSeller }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [remember, setRemember] = useState(true);
@@ -145,7 +126,7 @@ function SignInView({ role, onCreateAccount }) {
   const navigate = useNavigate();
 
   const finishLogin = ({ role, session }, rememberMe) => {
-    setEphemeral(!rememberMe); // unchecked "Remember me" → session dies with the browser
+    setEphemeral(!rememberMe);
     if (role === "member") {
       storeMemberSession(session);
       rememberSession("member", session.company_slug);
@@ -163,12 +144,7 @@ function SignInView({ role, onCreateAccount }) {
     if (!email.trim() || !password) return setError("Email and password are both required.");
     setSubmitting(true);
     setError("");
-    // Try the selected tab's role first; quietly fall back to the other so
-    // picking the "wrong" tab never locks a valid user out.
-    const result =
-      role === "seller"
-        ? await smartLogin(email.trim(), password, "seller")
-        : await smartLogin(email.trim(), password, "member");
+    const result = await smartLogin(email.trim(), password); // member or seller — auto-detected
     setSubmitting(false);
     if (!result) return setError("Wrong email or password.");
     finishLogin(result, remember);
@@ -178,7 +154,7 @@ function SignInView({ role, onCreateAccount }) {
     if (!supabaseConfigured) return setError("Backend not connected — the site owner must set the Supabase env vars.");
     setDemoBusy(acc.email);
     setError("");
-    const result = await smartLogin(acc.email, acc.password);
+    const result = await smartLogin(acc.email, acc.password, acc.sub === "member" ? "member" : "seller");
     setDemoBusy(null);
     if (!result) return setError("Demo accounts aren't set up yet — run the latest schema.sql in Supabase.");
     finishLogin(result, true);
@@ -186,7 +162,7 @@ function SignInView({ role, onCreateAccount }) {
 
   return (
     <>
-      <form onSubmit={submit} className="space-y-4">
+      <form onSubmit={submit} className="space-y-3">
         <div className="relative">
           <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-steel pointer-events-none" />
           <input
@@ -229,44 +205,44 @@ function SignInView({ role, onCreateAccount }) {
         </button>
       </form>
 
-      <p className="text-center text-sm text-steel mt-5">
-        New here?{" "}
-        <button onClick={onCreateAccount} className="text-turmeric-dark font-semibold hover:underline">
-          Create {role} account
+      {/* One click straight to the right signup — no in-between screen */}
+      <div className="flex items-center justify-center gap-2 text-sm mt-4">
+        <span className="text-steel">New here?</span>
+        <button onClick={onCreateMember} className="text-turmeric-dark font-semibold hover:underline">
+          Join as member
         </button>
-      </p>
+        <span className="text-ink/20">|</span>
+        <button onClick={onCreateSeller} className="text-turmeric-dark font-semibold hover:underline">
+          Create canteen
+        </button>
+      </div>
 
       {/* Demo: one tap signs you straight in */}
-      <div className="mt-7">
-        <div className="flex items-center gap-3 mb-3">
+      <div className="mt-5">
+        <div className="flex items-center gap-3 mb-2.5">
           <div className="flex-1 h-px bg-ink/10" />
           <span className="text-[11px] font-mono uppercase tracking-widest text-steel">or try the demo</span>
           <div className="flex-1 h-px bg-ink/10" />
         </div>
-        <div className="flex flex-wrap justify-center gap-2">
+        <div className="flex flex-wrap justify-center gap-1.5">
           {DEMO_ACCOUNTS.map((acc) => (
             <button
               key={acc.email}
               onClick={() => signInAsDemo(acc)}
               disabled={demoBusy !== null}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-ink/15 bg-white text-sm font-medium hover:border-turmeric hover:bg-turmeric/5 disabled:opacity-50 transition"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ink/15 bg-white text-xs font-medium hover:border-turmeric hover:bg-turmeric/5 disabled:opacity-50 transition"
               title={`${acc.email} · ${acc.password}`}
             >
               {demoBusy === acc.email ? (
-                <Loader2 size={14} className="animate-spin" />
+                <Loader2 size={13} className="animate-spin" />
               ) : (
-                <acc.Icon size={14} className={acc.sub === "member" ? "text-sage" : "text-turmeric-dark"} />
+                <acc.Icon size={13} className={acc.sub === "member" ? "text-sage" : "text-turmeric-dark"} />
               )}
               {acc.label}
-              <span className="text-[10px] text-steel font-normal">· {acc.sub}</span>
             </button>
           ))}
         </div>
       </div>
-
-      <p className="text-center text-[11px] text-steel mt-8">
-        For support, contact your canteen seller from the app after signing in.
-      </p>
     </>
   );
 }
